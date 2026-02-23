@@ -23,6 +23,9 @@ CREATE CONSTRAINT investigation_id_unique IF NOT EXISTS
 CREATE CONSTRAINT amendment_id_unique IF NOT EXISTS
   FOR (a:Amendment) REQUIRE a.amendment_id IS UNIQUE;
 
+CREATE CONSTRAINT health_cnes_code_unique IF NOT EXISTS
+  FOR (h:Health) REQUIRE h.cnes_code IS UNIQUE;
+
 // -- Indexes --
 CREATE INDEX person_name IF NOT EXISTS
   FOR (p:Person) ON (p.name);
@@ -69,10 +72,19 @@ CREATE INDEX sanction_date_start IF NOT EXISTS
 CREATE INDEX amendment_date IF NOT EXISTS
   FOR (a:Amendment) ON (a.date);
 
+CREATE INDEX health_name IF NOT EXISTS
+  FOR (h:Health) ON (h.name);
+
+CREATE INDEX health_uf IF NOT EXISTS
+  FOR (h:Health) ON (h.uf);
+
+CREATE INDEX health_municipio IF NOT EXISTS
+  FOR (h:Health) ON (h.municipio);
+
 // -- Fulltext Search Index --
 CREATE FULLTEXT INDEX entity_search IF NOT EXISTS
-  FOR (n:Person|Company)
-  ON EACH [n.name, n.razao_social, n.cpf, n.cnpj];
+  FOR (n:Person|Company|Health)
+  ON EACH [n.name, n.razao_social, n.cpf, n.cnpj, n.cnes_code];
 
 // -- User Constraints --
 CREATE CONSTRAINT user_email_unique IF NOT EXISTS

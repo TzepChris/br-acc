@@ -3,8 +3,18 @@ import logging
 import click
 from neo4j import GraphDatabase
 
+from icarus_etl.pipelines.bndes import BndesPipeline
 from icarus_etl.pipelines.cnpj import CNPJPipeline
+from icarus_etl.pipelines.comprasnet import ComprasnetPipeline
+from icarus_etl.pipelines.datasus import DatasusPipeline
+from icarus_etl.pipelines.dou import DouPipeline
+from icarus_etl.pipelines.ibama import IbamaPipeline
+from icarus_etl.pipelines.inep import InepPipeline
+from icarus_etl.pipelines.pgfn import PgfnPipeline
+from icarus_etl.pipelines.rais import RaisPipeline
 from icarus_etl.pipelines.sanctions import SanctionsPipeline
+from icarus_etl.pipelines.tcu import TcuPipeline
+from icarus_etl.pipelines.transferegov import TransferegovPipeline
 from icarus_etl.pipelines.transparencia import TransparenciaPipeline
 from icarus_etl.pipelines.tse import TSEPipeline
 
@@ -13,6 +23,16 @@ PIPELINES: dict[str, type] = {
     "tse": TSEPipeline,
     "transparencia": TransparenciaPipeline,
     "sanctions": SanctionsPipeline,
+    "bndes": BndesPipeline,
+    "pgfn": PgfnPipeline,
+    "ibama": IbamaPipeline,
+    "comprasnet": ComprasnetPipeline,
+    "tcu": TcuPipeline,
+    "transferegov": TransferegovPipeline,
+    "rais": RaisPipeline,
+    "inep": InepPipeline,
+    "dou": DouPipeline,
+    "datasus": DatasusPipeline,
 }
 
 
@@ -23,7 +43,7 @@ def cli() -> None:
 
 
 @cli.command()
-@click.option("--source", required=True, help="Pipeline: cnpj, tse, transparencia, sanctions")
+@click.option("--source", required=True, help="Pipeline name (see 'sources' command)")
 @click.option("--neo4j-uri", default="bolt://localhost:7687", help="Neo4j URI")
 @click.option("--neo4j-user", default="neo4j", help="Neo4j user")
 @click.option("--neo4j-password", required=True, help="Neo4j password")
@@ -109,10 +129,8 @@ def download(output_dir: str, files: int, skip_existing: bool) -> None:
 def sources() -> None:
     """List available data sources."""
     click.echo("Available pipelines:")
-    click.echo("  cnpj          - Receita Federal (Company Registry)")
-    click.echo("  tse           - Tribunal Superior Eleitoral (Elections)")
-    click.echo("  transparencia - Portal da Transparencia (Federal Spending)")
-    click.echo("  sanctions     - CEIS/CNEP/CEPIM/CEAF (Sanctions)")
+    for name in sorted(PIPELINES):
+        click.echo(f"  {name}")
 
 
 if __name__ == "__main__":

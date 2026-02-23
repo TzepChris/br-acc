@@ -11,7 +11,13 @@ from icarus_etl.base import Pipeline
 if TYPE_CHECKING:
     from neo4j import Driver
 from icarus_etl.loader import Neo4jBatchLoader
-from icarus_etl.transforms import deduplicate_rows, format_cnpj, format_cpf, normalize_name
+from icarus_etl.transforms import (
+    deduplicate_rows,
+    format_cnpj,
+    format_cpf,
+    normalize_name,
+    parse_date,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +193,7 @@ class CNPJPipeline(Pipeline):
         self.companies: list[dict[str, Any]] = []
         self.partners: list[dict[str, Any]] = []
         self.relationships: list[dict[str, Any]] = []
+        self.pj_relationships: list[dict[str, Any]] = []
 
     # --- Reference tables ---
 
@@ -445,8 +452,13 @@ class CNPJPipeline(Pipeline):
 
     def _transform_socios_rf(
         self, df: pd.DataFrame,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Vectorized transform for RF-format socios. Returns (partners, relationships)."""
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+        """Vectorized transform for RF-format socios.
+
+        Returns (pf_partners, pf_relationships, pj_relationships).
+        PJ partners (identificador_socio="1") create Company→Company SOCIO_DE.
+        PF partners (identificador_socio="2") create Person→Company SOCIO_DE.
+        """
         df = df.copy()
         lookup = self._estab_lookup
         df["basico"] = df["cnpj_basico"].astype(str).str.zfill(8)
@@ -454,50 +466,89 @@ class CNPJPipeline(Pipeline):
             lambda b: lookup[b][0] if b in lookup else format_cnpj(b + "000100"),
         )
         df["nome"] = df["nome_socio"].astype(str).map(normalize_name)
-        df["cpf"] = df["cpf_cnpj_socio"].astype(str).map(format_cpf)
         df["tipo"] = df["identificador_socio"].astype(str)
         df["qualificacao"] = df["qualificacao_socio"].astype(str).map(
             lambda c: self._resolve_reference("qualificacoes", c),
         )
-        df["data_entrada"] = df["data_entrada"].astype(str)
-        partners: list[dict[str, Any]] = df[["nome", "cpf", "tipo"]].rename(
-            columns={"nome": "name", "tipo": "tipo_socio"},
+        df["data_entrada"] = df["data_entrada"].astype(str).map(parse_date)
+
+        # Split PJ (tipo=1) from PF (tipo=2 or other)
+        pj_mask = df["tipo"] == "1"
+        pf_df = df[~pj_mask].copy()
+        pj_df = df[pj_mask].copy()
+
+        # PF partners: format as CPF, create Person nodes
+        pf_df["doc"] = pf_df["cpf_cnpj_socio"].astype(str).map(format_cpf)
+        pf_partners: list[dict[str, Any]] = pf_df[["nome", "doc", "tipo"]].rename(
+            columns={"nome": "name", "doc": "cpf", "tipo": "tipo_socio"},
         ).to_dict("records")  # type: ignore[assignment]
-        relationships: list[dict[str, Any]] = pd.DataFrame({
-            "source_key": df["cpf"],
-            "target_key": df["cnpj"],
-            "tipo_socio": df["tipo"],
-            "qualificacao": df["qualificacao"],
-            "data_entrada": df["data_entrada"],
+        pf_relationships: list[dict[str, Any]] = pd.DataFrame({
+            "source_key": pf_df["doc"],
+            "target_key": pf_df["cnpj"],
+            "tipo_socio": pf_df["tipo"],
+            "qualificacao": pf_df["qualificacao"],
+            "data_entrada": pf_df["data_entrada"],
         }).to_dict("records")  # type: ignore[assignment]
-        return partners, relationships
+
+        # PJ partners: format as CNPJ, create Company→Company relationships
+        pj_df["doc"] = pj_df["cpf_cnpj_socio"].astype(str).map(format_cnpj)
+        pj_relationships: list[dict[str, Any]] = pd.DataFrame({
+            "source_key": pj_df["doc"],
+            "target_key": pj_df["cnpj"],
+            "tipo_socio": pj_df["tipo"],
+            "qualificacao": pj_df["qualificacao"],
+            "data_entrada": pj_df["data_entrada"],
+        }).to_dict("records")  # type: ignore[assignment]
+
+        return pf_partners, pf_relationships, pj_relationships
 
     def _transform_socios_simple(
         self, df: pd.DataFrame,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Vectorized transform for simple-format socios. Returns (partners, relationships)."""
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+        """Vectorized transform for simple-format socios.
+
+        Returns (pf_partners, pf_relationships, pj_relationships).
+        """
         df = df.copy()
         df["cnpj"] = df["cnpj"].astype(str).map(format_cnpj)
         df["nome"] = df["nome_socio"].astype(str).map(normalize_name)
-        df["cpf"] = df["cpf_socio"].astype(str).map(format_cpf)
         df["tipo"] = df["tipo_socio"].astype(str)
         df["qualificacao"] = df.get(
             "qualificacao_socio", pd.Series("", index=df.index),
         ).astype(str)
         df["data_entrada"] = df.get(
             "data_entrada", pd.Series("", index=df.index),
-        ).astype(str)
-        partners: list[dict[str, Any]] = df[["nome", "cpf", "tipo"]].rename(
-            columns={"nome": "name", "tipo": "tipo_socio"},
+        ).astype(str).map(parse_date)
+
+        # Split PJ (tipo=1) from PF (tipo=2 or other)
+        pj_mask = df["tipo"] == "1"
+        pf_df = df[~pj_mask].copy()
+        pj_df = df[pj_mask].copy()
+
+        # PF partners
+        pf_df["doc"] = pf_df["cpf_socio"].astype(str).map(format_cpf)
+        pf_partners: list[dict[str, Any]] = pf_df[["nome", "doc", "tipo"]].rename(
+            columns={"nome": "name", "doc": "cpf", "tipo": "tipo_socio"},
         ).to_dict("records")  # type: ignore[assignment]
-        relationships: list[dict[str, Any]] = pd.DataFrame({
-            "source_key": df["cpf"],
-            "target_key": df["cnpj"],
-            "tipo_socio": df["tipo"],
-            "qualificacao": df["qualificacao"],
-            "data_entrada": df["data_entrada"],
+        pf_relationships: list[dict[str, Any]] = pd.DataFrame({
+            "source_key": pf_df["doc"],
+            "target_key": pf_df["cnpj"],
+            "tipo_socio": pf_df["tipo"],
+            "qualificacao": pf_df["qualificacao"],
+            "data_entrada": pf_df["data_entrada"],
         }).to_dict("records")  # type: ignore[assignment]
-        return partners, relationships
+
+        # PJ partners
+        pj_df["doc"] = pj_df["cpf_socio"].astype(str).map(format_cnpj)
+        pj_relationships: list[dict[str, Any]] = pd.DataFrame({
+            "source_key": pj_df["doc"],
+            "target_key": pj_df["cnpj"],
+            "tipo_socio": pj_df["tipo"],
+            "qualificacao": pj_df["qualificacao"],
+            "data_entrada": pj_df["data_entrada"],
+        }).to_dict("records")  # type: ignore[assignment]
+
+        return pf_partners, pf_relationships, pj_relationships
 
     def transform(self) -> None:
         """Transform raw data into normalized company, partner, and relationship records."""
@@ -514,15 +565,17 @@ class CNPJPipeline(Pipeline):
 
         is_rf_socios = "cpf_cnpj_socio" in self._raw_socios.columns
         if is_rf_socios:
-            partners, rels = self._transform_socios_rf(self._raw_socios)
+            partners, pf_rels, pj_rels = self._transform_socios_rf(self._raw_socios)
         else:
-            partners, rels = self._transform_socios_simple(self._raw_socios)
+            partners, pf_rels, pj_rels = self._transform_socios_simple(self._raw_socios)
         self.partners = deduplicate_rows(partners, ["cpf"])
-        self.relationships = rels
+        self.relationships = pf_rels
+        self.pj_relationships = pj_rels
         logger.info(
-            "Transformed %d partners, %d relationships",
+            "Transformed %d partners, %d PF relationships, %d PJ relationships",
             len(self.partners),
             len(self.relationships),
+            len(self.pj_relationships),
         )
 
     # --- Streaming pipeline for large datasets ---
@@ -661,6 +714,7 @@ class CNPJPipeline(Pipeline):
                 socio_files = self._find_rf_files("Socios*")
             logger.info("Phase 3: Streaming %d RF Socios files", len(socio_files))
 
+        total_pj_rels = 0
         for f in socio_files:
             logger.info("  Processing %s...", f.name)
             chunks = (
@@ -669,29 +723,40 @@ class CNPJPipeline(Pipeline):
                 else self._read_rf_file_chunks(f, SOCIOS_COLS)
             )
             for chunk in chunks:
-                partners, rels = self._transform_socios_rf(chunk)
+                partners, pf_rels, pj_rels = self._transform_socios_rf(chunk)
                 if partners:
                     loader.load_nodes("Person", partners, key_field="cpf")
                     total_partners += len(partners)
-                if rels:
+                if pf_rels:
                     loader.load_relationships(
                         rel_type="SOCIO_DE",
-                        rows=rels,
+                        rows=pf_rels,
                         source_label="Person",
                         source_key="cpf",
                         target_label="Company",
                         target_key="cnpj",
                         properties=["tipo_socio", "qualificacao", "data_entrada"],
                     )
-                    total_rels += len(rels)
+                    total_rels += len(pf_rels)
+                if pj_rels:
+                    loader.load_relationships(
+                        rel_type="SOCIO_DE",
+                        rows=pj_rels,
+                        source_label="Company",
+                        source_key="cnpj",
+                        target_label="Company",
+                        target_key="cnpj",
+                        properties=["tipo_socio", "qualificacao", "data_entrada"],
+                    )
+                    total_pj_rels += len(pj_rels)
             logger.info(
-                "  Partners: %d, Relationships: %d so far",
-                total_partners, total_rels,
+                "  Partners: %d, PF rels: %d, PJ rels: %d so far",
+                total_partners, total_rels, total_pj_rels,
             )
 
         logger.info(
-            "Streaming complete: %d companies, %d partners, %d relationships",
-            total_companies, total_partners, total_rels,
+            "Streaming complete: %d companies, %d partners, %d PF rels, %d PJ rels",
+            total_companies, total_partners, total_rels, total_pj_rels,
         )
 
     def load(self) -> None:
@@ -709,6 +774,17 @@ class CNPJPipeline(Pipeline):
                 rows=self.relationships,
                 source_label="Person",
                 source_key="cpf",
+                target_label="Company",
+                target_key="cnpj",
+                properties=["tipo_socio", "qualificacao", "data_entrada"],
+            )
+
+        if self.pj_relationships:
+            loader.load_relationships(
+                rel_type="SOCIO_DE",
+                rows=self.pj_relationships,
+                source_label="Company",
+                source_key="cnpj",
                 target_label="Company",
                 target_key="cnpj",
                 properties=["tipo_socio", "qualificacao", "data_entrada"],

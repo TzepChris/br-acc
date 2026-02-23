@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 
@@ -83,14 +83,20 @@ export function EntityAnalysis() {
   const [patterns, setPatterns] = useState<PatternResponse | null>(null);
   const [baseline, setBaseline] = useState<BaselineResponse | null>(null);
 
+  // Lazy-load tracking: only fetch heavy data when its section is first viewed
+  const loadedSectionsRef = useRef<Set<string>>(new Set());
+
   const { data: exposure, loading: exposureLoading } = useEntityExposure(id);
   const { data: graphData, loading: graphLoading } = useGraphData(id, graphStore.depth);
+
+  // Timeline: only fetch when timeline tab is activated
+  const [timelineEnabled, setTimelineEnabled] = useState(false);
   const {
     events: timelineEvents,
     loading: timelineLoading,
     hasMore: timelineHasMore,
     loadMore: timelineLoadMore,
-  } = useEntityTimeline(id);
+  } = useEntityTimeline(timelineEnabled ? id : "");
 
   // Investigation modal
   const [showInvModal, setShowInvModal] = useState(false);
@@ -98,26 +104,48 @@ export function EntityAnalysis() {
   const [invLoading, setInvLoading] = useState(false);
   const [newInvTitle, setNewInvTitle] = useState("");
 
-  // Fetch entity + patterns + baseline
+  // Reset lazy-load tracking on entity change
+  useEffect(() => {
+    loadedSectionsRef.current = new Set();
+    setTimelineEnabled(false);
+  }, [id]);
+
+  // Trigger lazy loads when tabs are activated
+  useEffect(() => {
+    if (activeTab === "timeline" && !loadedSectionsRef.current.has("timeline")) {
+      loadedSectionsRef.current.add("timeline");
+      setTimelineEnabled(true);
+    }
+  }, [activeTab]);
+
+  // Fetch entity only on mount — patterns and baseline are deferred
   useEffect(() => {
     if (!id) return;
     setEntityLoading(true);
 
-    Promise.all([
-      getEntityByElementId(id),
-      getEntityPatterns(id),
-      getBaseline(id),
-    ])
-      .then(([ent, pat, base]) => {
+    getEntityByElementId(id)
+      .then((ent) => {
         setEntity(ent);
-        setPatterns(pat);
-        setBaseline(base);
       })
       .catch(() => {
-        // Individual errors handled by components
+        // Error handled by component (shows notFound)
       })
       .finally(() => setEntityLoading(false));
   }, [id]);
+
+  // Lazy-load patterns + baseline after entity loads (non-blocking)
+  useEffect(() => {
+    if (!id || !entity) return;
+    if (loadedSectionsRef.current.has("insights")) return;
+    loadedSectionsRef.current.add("insights");
+
+    getEntityPatterns(id)
+      .then(setPatterns)
+      .catch(() => {});
+    getBaseline(id)
+      .then(setBaseline)
+      .catch(() => {});
+  }, [id, entity]);
 
   // Save to recent analyses
   useEffect(() => {

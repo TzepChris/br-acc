@@ -202,8 +202,8 @@ class TSEPipeline(Pipeline):
                 "UNWIND $rows AS row "
                 "MATCH (d:Person {cpf: row.source_key}) "
                 "MATCH (c:Person {sq_candidato: row.target_key}) "
-                "MERGE (d)-[r:DOOU]->(c) "
-                "SET r.valor = row.valor, r.year = row.year",
+                "MERGE (d)-[r:DOOU {year: row.year}]->(c) "
+                "SET r.valor = row.valor",
                 person_donation_rels,
             )
 
@@ -223,7 +223,7 @@ class TSEPipeline(Pipeline):
                 "UNWIND $rows AS row "
                 "MATCH (d:Company {cnpj: row.source_key}) "
                 "MATCH (c:Person {sq_candidato: row.target_key}) "
-                "MERGE (d)-[r:DOOU]->(c) "
-                "SET r.valor = row.valor, r.year = row.year",
+                "MERGE (d)-[r:DOOU {year: row.year}]->(c) "
+                "SET r.valor = row.valor",
                 company_donation_rels,
             )

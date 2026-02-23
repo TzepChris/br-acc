@@ -372,8 +372,17 @@ export interface StatsResponse {
   total_relationships: number;
   person_count: number;
   company_count: number;
+  health_count: number;
+  finance_count: number;
+  contract_count: number;
+  sanction_count: number;
+  election_count: number;
+  amendment_count: number;
+  embargo_count: number;
+  education_count: number;
+  convenio_count: number;
+  laborstats_count: number;
   data_sources: number;
-  indexes: number;
 }
 
 export function getStats(): Promise<StatsResponse> {

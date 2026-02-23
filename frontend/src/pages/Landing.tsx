@@ -10,8 +10,17 @@ import styles from "./Landing.module.css";
 const DATA_SOURCES = [
   { nameKey: "CNPJ", descKey: "landing.sources.cnpj" },
   { nameKey: "TSE", descKey: "landing.sources.tse" },
-  { nameKey: "Transparencia", descKey: "landing.sources.transparencia" },
+  { nameKey: "Transparência", descKey: "landing.sources.transparencia" },
   { nameKey: "CEIS/CNEP", descKey: "landing.sources.sanctions" },
+  { nameKey: "DATASUS", descKey: "landing.sources.cnes" },
+  { nameKey: "BNDES", descKey: "landing.sources.bndes" },
+  { nameKey: "PGFN", descKey: "landing.sources.pgfn" },
+  { nameKey: "IBAMA", descKey: "landing.sources.ibama" },
+  { nameKey: "ComprasNet", descKey: "landing.sources.comprasnet" },
+  { nameKey: "TCU", descKey: "landing.sources.tcu" },
+  { nameKey: "TransfereGov", descKey: "landing.sources.transferegov" },
+  { nameKey: "RAIS", descKey: "landing.sources.rais" },
+  { nameKey: "INEP", descKey: "landing.sources.inep" },
 ] as const;
 
 export function Landing() {

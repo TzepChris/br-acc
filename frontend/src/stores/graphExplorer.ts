@@ -40,6 +40,12 @@ const INITIAL_ENTITY_TYPES = new Set([
   "contract",
   "sanction",
   "amendment",
+  "health",
+  "finance",
+  "embargo",
+  "education",
+  "convenio",
+  "laborstats",
 ]);
 
 const INITIAL_REL_TYPES = new Set([
@@ -49,6 +55,13 @@ const INITIAL_REL_TYPES = new Set([
   "VENCEU",
   "AUTOR_EMENDA",
   "SANCIONADA",
+  "OPERA_UNIDADE",
+  "DEVE",
+  "RECEBEU_EMPRESTIMO",
+  "EMBARGADA",
+  "MANTEDORA_DE",
+  "BENEFICIOU",
+  "GEROU_CONVENIO",
 ]);
 
 function initialState() {

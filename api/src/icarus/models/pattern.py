@@ -49,4 +49,28 @@ PATTERN_METADATA: dict[str, dict[str, str]] = {
         "desc_pt": "Participação desproporcional de contratos em um município",
         "desc_en": "Disproportionate share of contracts in a municipality",
     },
+    "debtor_contracts": {
+        "name_pt": "Devedor com contratos públicos",
+        "name_en": "Debtor with public contracts",
+        "desc_pt": "Empresa com dívida ativa na PGFN que venceu licitações públicas",
+        "desc_en": "Company with active PGFN tax debt that won public contracts",
+    },
+    "embargoed_receiving": {
+        "name_pt": "Embargada recebendo recursos",
+        "name_en": "Embargoed receiving funds",
+        "desc_pt": (
+            "Empresa com embargo ambiental do IBAMA"
+            " que recebeu contratos ou empréstimos públicos"
+        ),
+        "desc_en": (
+            "Company with IBAMA environmental embargo"
+            " that received public contracts or loans"
+        ),
+    },
+    "loan_debtor": {
+        "name_pt": "Tomador de empréstimo com dívida",
+        "name_en": "Loan recipient with debt",
+        "desc_pt": "Empresa que recebeu empréstimo do BNDES enquanto possuía dívida ativa na PGFN",
+        "desc_en": "Company that received BNDES loan while having active PGFN tax debt",
+    },
 }

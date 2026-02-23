@@ -98,45 +98,43 @@ function GraphCanvasInner({
   const [tooltip, setTooltip] = useState<{ node: GraphNodeObject; x: number; y: number } | null>(null);
   const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Filter nodes by type + hidden
-  const filteredNodes = useMemo(
-    () => data.nodes.filter((n) => enabledTypes.has(n.type) && !hiddenNodeIds.has(n.id)),
+  // Visible node IDs (for link visibility check)
+  const visibleNodeIds = useMemo(
+    () => new Set(
+      data.nodes
+        .filter((n) => enabledTypes.has(n.type) && !hiddenNodeIds.has(n.id))
+        .map((n) => n.id),
+    ),
     [data.nodes, enabledTypes, hiddenNodeIds],
   );
 
-  const filteredNodeIds = useMemo(
-    () => new Set(filteredNodes.map((n) => n.id)),
-    [filteredNodes],
-  );
-
-  // Filter edges by node visibility + rel type
-  const filteredEdges = useMemo(
-    () =>
-      data.edges.filter(
-        (e) =>
-          filteredNodeIds.has(e.source) &&
-          filteredNodeIds.has(e.target) &&
-          enabledRelTypes.has(e.type),
-      ),
-    [data.edges, filteredNodeIds, enabledRelTypes],
-  );
-
-  const connectionCounts = useMemo(() => {
+  // Connection counts based on visible edges, stored in ref to avoid destabilizing graphData.
+  // Using useEffect to keep the ref in sync without causing graphData to change on filter toggles.
+  const connectionCountsRef = useRef(new Map<string, number>());
+  useEffect(() => {
     const counts = new Map<string, number>();
-    for (const edge of filteredEdges) {
-      counts.set(edge.source, (counts.get(edge.source) ?? 0) + 1);
-      counts.set(edge.target, (counts.get(edge.target) ?? 0) + 1);
+    for (const edge of data.edges) {
+      if (
+        visibleNodeIds.has(edge.source) &&
+        visibleNodeIds.has(edge.target) &&
+        enabledRelTypes.has(edge.type)
+      ) {
+        counts.set(edge.source, (counts.get(edge.source) ?? 0) + 1);
+        counts.set(edge.target, (counts.get(edge.target) ?? 0) + 1);
+      }
     }
-    return counts;
-  }, [filteredEdges]);
+    connectionCountsRef.current = counts;
+  }, [data.edges, visibleNodeIds, enabledRelTypes]);
 
+  // Stable graphData — only changes when underlying data changes, not on filter toggles.
+  // This prevents d3-force simulation restarts when toggling type filters.
   const graphData = useMemo(
     () => ({
-      nodes: filteredNodes.map((n) => ({
+      nodes: data.nodes.map((n) => ({
         ...n,
-        connectionCount: connectionCounts.get(n.id) ?? 0,
+        connectionCount: 0, // Updated via ref at render time
       })),
-      links: filteredEdges.map((e) => ({
+      links: data.edges.map((e) => ({
         source: e.source,
         target: e.target,
         type: e.type,
@@ -145,10 +143,30 @@ function GraphCanvasInner({
         properties: e.properties,
       })),
     }),
-    [filteredNodes, filteredEdges, connectionCounts],
+    [data.nodes, data.edges],
   );
 
-  // Configure d3 forces for better layout
+  // Visibility callbacks — hide/show without recreating the graph data
+  const nodeVisibility = useCallback(
+    (node: GraphNodeObject) =>
+      enabledTypes.has(node.type) && !hiddenNodeIds.has(node.id),
+    [enabledTypes, hiddenNodeIds],
+  );
+
+  const linkVisibility = useCallback(
+    (link: GraphLinkObject) => {
+      const src = typeof link.source === "object" ? (link.source as GraphNodeObject).id : (link.source as string);
+      const tgt = typeof link.target === "object" ? (link.target as GraphNodeObject).id : (link.target as string);
+      return (
+        enabledRelTypes.has(link.type) &&
+        visibleNodeIds.has(src) &&
+        visibleNodeIds.has(tgt)
+      );
+    },
+    [enabledRelTypes, visibleNodeIds],
+  );
+
+  // Configure d3 forces for better layout — only reheat when underlying data changes
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg) return;
@@ -157,26 +175,34 @@ function GraphCanvasInner({
     const link = fg.d3Force("link") as { distance?: (d: number | ((l: unknown) => number)) => void } | undefined;
     link?.distance?.(100);
     fg.d3ReheatSimulation();
-  }, [graphData]);
+  }, [data]);
 
-  // Adjacency set for hover dimming
+  // Adjacency set for hover dimming (use all edges, check visibility at render time)
   const adjacentToHovered = useMemo(() => {
     if (!hoveredNodeId) return null;
     const adj = new Set<string>([hoveredNodeId]);
-    for (const edge of filteredEdges) {
-      if (edge.source === hoveredNodeId) adj.add(edge.target);
-      if (edge.target === hoveredNodeId) adj.add(edge.source);
+    for (const edge of data.edges) {
+      if (
+        visibleNodeIds.has(edge.source) &&
+        visibleNodeIds.has(edge.target) &&
+        enabledRelTypes.has(edge.type)
+      ) {
+        if (edge.source === hoveredNodeId) adj.add(edge.target);
+        if (edge.target === hoveredNodeId) adj.add(edge.source);
+      }
     }
     return adj;
-  }, [hoveredNodeId, filteredEdges]);
+  }, [hoveredNodeId, data.edges, visibleNodeIds, enabledRelTypes]);
 
   // Minimap nodes — x/y are added at runtime by ForceGraph2D layout engine
   const minimapNodes = useMemo(
     () =>
       (graphData.nodes as (typeof graphData.nodes[number] & { x?: number; y?: number })[])
-        .filter((n): n is typeof n & { x: number; y: number } => n.x != null && n.y != null)
+        .filter((n): n is typeof n & { x: number; y: number } =>
+          n.x != null && n.y != null && visibleNodeIds.has(n.id),
+        )
         .map((n) => ({ x: n.x, y: n.y, type: n.type })),
-    [graphData.nodes],
+    [graphData, visibleNodeIds],
   );
 
   const nodeColor = useCallback((node: GraphNodeObject) => {
@@ -185,7 +211,8 @@ function GraphCanvasInner({
 
   const nodeSize = useCallback(
     (node: GraphNodeObject) => {
-      return getNodeSize(node.connectionCount ?? 0, node.id === centerId);
+      const count = connectionCountsRef.current.get(node.id) ?? 0;
+      return getNodeSize(count, node.id === centerId);
     },
     [centerId],
   );
@@ -311,6 +338,8 @@ function GraphCanvasInner({
           width={dimensions.width}
           height={dimensions.height}
           graphData={graphData}
+          nodeVisibility={nodeVisibility}
+          linkVisibility={linkVisibility}
           nodeColor={nodeColor}
           nodeVal={nodeSize}
           nodeLabel=""
@@ -341,7 +370,7 @@ function GraphCanvasInner({
               y: node.y,
               type: node.type,
               label: node.label,
-              connectionCount: node.connectionCount ?? 0,
+              connectionCount: connectionCountsRef.current.get(node.id) ?? 0,
               isCenter: node.id === centerId,
               isSelected: selectedNodeIds.has(node.id),
               isHovered: hoveredNodeId === node.id,

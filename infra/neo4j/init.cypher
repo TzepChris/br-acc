@@ -63,6 +63,67 @@ CREATE INDEX contract_contracting_org IF NOT EXISTS
 CREATE INDEX contract_date IF NOT EXISTS
   FOR (c:Contract) ON (c.date);
 
+// ── Finance Indexes ───────────────────────────────────
+CREATE INDEX finance_id_idx IF NOT EXISTS
+  FOR (f:Finance) ON (f.finance_id);
+
+CREATE INDEX finance_type IF NOT EXISTS
+  FOR (f:Finance) ON (f.type);
+
+CREATE INDEX finance_value IF NOT EXISTS
+  FOR (f:Finance) ON (f.value);
+
+CREATE INDEX finance_date IF NOT EXISTS
+  FOR (f:Finance) ON (f.date);
+
+CREATE INDEX finance_source IF NOT EXISTS
+  FOR (f:Finance) ON (f.source);
+
+// ── Embargo Indexes ───────────────────────────────────
+CREATE INDEX embargo_id IF NOT EXISTS
+  FOR (e:Embargo) ON (e.embargo_id);
+
+CREATE INDEX embargo_uf IF NOT EXISTS
+  FOR (e:Embargo) ON (e.uf);
+
+CREATE INDEX embargo_biome IF NOT EXISTS
+  FOR (e:Embargo) ON (e.biome);
+
+// ── Sanction Date Index ───────────────────────────────
+CREATE INDEX sanction_date_start IF NOT EXISTS
+  FOR (s:Sanction) ON (s.date_start);
+
+CREATE INDEX amendment_date IF NOT EXISTS
+  FOR (a:Amendment) ON (a.date);
+
+// ── New Node Constraints ────────────────────────────────
+CREATE CONSTRAINT finance_id_unique IF NOT EXISTS
+  FOR (f:Finance) REQUIRE f.finance_id IS UNIQUE;
+
+CREATE CONSTRAINT embargo_id_unique IF NOT EXISTS
+  FOR (e:Embargo) REQUIRE e.embargo_id IS UNIQUE;
+
+CREATE CONSTRAINT education_school_id_unique IF NOT EXISTS
+  FOR (e:Education) REQUIRE e.school_id IS UNIQUE;
+
+CREATE CONSTRAINT convenio_id_unique IF NOT EXISTS
+  FOR (c:Convenio) REQUIRE c.convenio_id IS UNIQUE;
+
+CREATE CONSTRAINT laborstats_id_unique IF NOT EXISTS
+  FOR (l:LaborStats) REQUIRE l.stats_id IS UNIQUE;
+
+// ── Education Indexes ───────────────────────────────────
+CREATE INDEX education_name IF NOT EXISTS
+  FOR (e:Education) ON (e.name);
+
+// ── Convenio Indexes ────────────────────────────────────
+CREATE INDEX convenio_date IF NOT EXISTS
+  FOR (c:Convenio) ON (c.date);
+
+// ── LaborStats Indexes ──────────────────────────────────
+CREATE INDEX laborstats_uf IF NOT EXISTS
+  FOR (l:LaborStats) ON (l.uf);
+
 // ── Fulltext Search Index ───────────────────────────────
 CREATE FULLTEXT INDEX entity_search IF NOT EXISTS
   FOR (n:Person|Company)

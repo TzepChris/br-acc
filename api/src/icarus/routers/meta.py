@@ -38,8 +38,17 @@ async def database_stats(
         "total_relationships": record["total_relationships"] if record else 0,
         "person_count": record["person_count"] if record else 0,
         "company_count": record["company_count"] if record else 0,
-        "data_sources": 4,
-        "indexes": 23,
+        "health_count": record["health_count"] if record else 0,
+        "finance_count": record["finance_count"] if record else 0,
+        "contract_count": record["contract_count"] if record else 0,
+        "sanction_count": record["sanction_count"] if record else 0,
+        "election_count": record["election_count"] if record else 0,
+        "amendment_count": record["amendment_count"] if record else 0,
+        "embargo_count": record["embargo_count"] if record else 0,
+        "education_count": record["education_count"] if record else 0,
+        "convenio_count": record["convenio_count"] if record else 0,
+        "laborstats_count": record["laborstats_count"] if record else 0,
+        "data_sources": 14,
     }
 
     _stats_cache = result
@@ -55,5 +64,15 @@ async def list_sources() -> dict[str, list[dict[str, str]]]:
             {"id": "tse", "name": "Tribunal Superior Eleitoral", "frequency": "biennial"},
             {"id": "transparencia", "name": "Portal da Transparência", "frequency": "monthly"},
             {"id": "ceis", "name": "CEIS/CNEP/CEPIM/CEAF", "frequency": "monthly"},
+            {"id": "cnes", "name": "CNES/DATASUS", "frequency": "monthly"},
+            {"id": "bndes", "name": "BNDES (Empréstimos)", "frequency": "monthly"},
+            {"id": "pgfn", "name": "PGFN (Dívida Ativa)", "frequency": "monthly"},
+            {"id": "ibama", "name": "IBAMA (Embargos)", "frequency": "monthly"},
+            {"id": "comprasnet", "name": "ComprasNet/PNCP", "frequency": "monthly"},
+            {"id": "tcu", "name": "TCU (Sanções)", "frequency": "monthly"},
+            {"id": "transferegov", "name": "TransfereGov (Convênios)", "frequency": "monthly"},
+            {"id": "rais", "name": "RAIS (Estatísticas Trabalhistas)", "frequency": "annual"},
+            {"id": "inep", "name": "INEP (Censo Educação)", "frequency": "annual"},
+            {"id": "dou", "name": "Diário Oficial da União", "frequency": "daily"},
         ]
     }

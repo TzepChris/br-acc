@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,7 +10,31 @@ from icarus.models.entity import SourceAttribution
 from icarus.models.graph import GraphEdge, GraphNode, GraphResponse
 from icarus.services.neo4j_service import execute_query
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/v1/graph", tags=["graph"])
+
+_GRAPH_PROPS = {
+    "name", "razao_social", "cnpj", "cpf", "value", "date",
+    "type", "uf", "cargo", "partido",
+}
+
+_DEFAULT_LABEL_FILTER = "-User|-Investigation|-Annotation|-Tag"
+
+_LABEL_MAP: dict[str, str] = {
+    "person": "Person",
+    "company": "Company",
+    "contract": "Contract",
+    "sanction": "Sanction",
+    "election": "Election",
+    "amendment": "Amendment",
+    "finance": "Finance",
+    "embargo": "Embargo",
+    "health": "Health",
+    "education": "Education",
+    "convenio": "Convenio",
+    "laborstats": "LaborStats",
+}
 
 
 def _is_pep(properties: dict[str, Any]) -> bool:
@@ -22,7 +47,43 @@ def _extract_label(node: Any, labels: list[str]) -> str:
     entity_type = labels[0].lower() if labels else ""
     if entity_type == "company":
         return str(props.get("razao_social", props.get("name", props.get("nome_fantasia", ""))))
+    if entity_type == "finance":
+        if props.get("value"):
+            return f"Finance: R$ {props.get('value', 0):,.2f}"
+        return str(props.get("type", "Finance"))
+    if entity_type == "embargo":
+        return str(props.get("description", props.get("uf", "Embargo")))
+    if entity_type == "convenio":
+        return str(props.get("object", props.get("convenio_id", "Convenio")))
     return str(props.get("name", str(props.get("id", ""))))
+
+
+def _slim_props(node_props: dict[str, Any]) -> dict[str, Any]:
+    """Return only essential properties for graph rendering."""
+    return {k: v for k, v in node_props.items() if k in _GRAPH_PROPS}
+
+
+def _build_label_filter(type_list: list[str] | None) -> str:
+    """Build APOC labelFilter string from requested entity types.
+
+    When types are specified, include only those labels (with +) and
+    exclude internal labels. When no types, use negative-only filter.
+    """
+    if not type_list:
+        return _DEFAULT_LABEL_FILTER
+
+    parts: list[str] = []
+    for t in type_list:
+        neo4j_label = _LABEL_MAP.get(t)
+        if neo4j_label:
+            parts.append(f"+{neo4j_label}")
+
+    if not parts:
+        return _DEFAULT_LABEL_FILTER
+
+    # APOC labelFilter: +Label = whitelist, -Label = blacklist.
+    # The start node is always included in subgraphAll results.
+    return "|".join(parts) + "|-User|-Investigation|-Annotation|-Tag"
 
 
 @router.get("/{entity_id}", response_model=GraphResponse)
@@ -34,10 +95,28 @@ async def get_graph(
 ) -> GraphResponse:
     type_list = [t.strip().lower() for t in entity_types.split(",")] if entity_types else None
 
+    # Degree guard: cap depth to 1 for supernodes to prevent explosion
+    degree_records = await execute_query(
+        session, "node_degree", {"entity_id": entity_id}, timeout=5,
+    )
+    if not degree_records:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    degree = degree_records[0]["degree"] if degree_records else 0
+    if degree > 500:
+        logger.info(
+            "Supernode detected (degree=%d) for %s, capping depth to 1",
+            degree, entity_id,
+        )
+        depth = min(depth, 1)
+
+    label_filter = _build_label_filter(type_list)
+
     records = await execute_query(
         session,
         "graph_expand",
-        {"entity_id": entity_id, "entity_types": type_list, "depth": depth},
+        {"entity_id": entity_id, "label_filter": label_filter, "depth": depth},
+        timeout=5,
     )
 
     if not records:
@@ -56,9 +135,6 @@ async def get_graph(
         node_id = node.element_id
         labels = list(node.labels)
 
-        if type_list and not any(lb.lower() in type_list for lb in labels):
-            continue
-
         node_ids.add(node_id)
         props = dict(node)
         source_val = props.pop("source", None)
@@ -74,6 +150,12 @@ async def get_graph(
             or props.get("contract_id")
             or props.get("sanction_id")
             or props.get("amendment_id")
+            or props.get("cnes_code")
+            or props.get("finance_id")
+            or props.get("embargo_id")
+            or props.get("school_id")
+            or props.get("convenio_id")
+            or props.get("stats_id")
         )
         document_id = str(doc_id) if doc_id else None
 
@@ -82,7 +164,7 @@ async def get_graph(
             label=_extract_label(node, labels),
             type=labels[0].lower() if labels else "unknown",
             document_id=document_id,
-            properties=props,
+            properties=_slim_props(props),
             sources=sources,
             is_pep=_is_pep(props),
         ))

@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, Layers, GitFork, SlidersHorizontal } from "lucide-react";
 
@@ -21,6 +21,7 @@ interface ControlsSidebarProps {
 
 const ENTITY_TYPES = Object.keys(dataColors) as DataEntityType[];
 const REL_TYPES = Object.keys(relationshipColors);
+const DEPTH_DEBOUNCE_MS = 400;
 
 function ControlsSidebarInner({
   collapsed,
@@ -36,12 +37,39 @@ function ControlsSidebarInner({
 }: ControlsSidebarProps) {
   const { t } = useTranslation();
 
+  // Local slider value for immediate UI feedback; debounce actual store update
+  const [localDepth, setLocalDepth] = useState(depth);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync local state when parent prop changes (e.g. reset)
+  useEffect(() => {
+    setLocalDepth(depth);
+  }, [depth]);
+
   const handleDepthChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      onDepthChange(Number(e.target.value));
+      const value = Number(e.target.value);
+      setLocalDepth(value);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        onDepthChange(value);
+      }, DEPTH_DEBOUNCE_MS);
     },
     [onDepthChange],
   );
+
+  // Commit immediately on mouseup/touchend (user released slider)
+  const handleDepthCommit = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    onDepthChange(localDepth);
+  }, [onDepthChange, localDepth]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   const visibleCount = Object.entries(typeCounts).reduce(
     (sum, [type, count]) => (enabledTypes.has(type) ? sum + count : sum),
@@ -66,14 +94,16 @@ function ControlsSidebarInner({
           {/* Depth slider */}
           <div className={styles.section}>
             <label className={styles.sectionLabel}>
-              {t("graph.depth")}: {depth}
+              {t("graph.depth")}: {localDepth}
             </label>
             <input
               type="range"
               min={1}
               max={4}
-              value={depth}
+              value={localDepth}
               onChange={handleDepthChange}
+              onMouseUp={handleDepthCommit}
+              onTouchEnd={handleDepthCommit}
               className={styles.slider}
             />
           </div>

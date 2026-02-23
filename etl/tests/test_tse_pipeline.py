@@ -133,6 +133,59 @@ def test_transform_identifies_company_donors() -> None:
     assert len(person_donations) == 2
 
 
+def test_load_doou_merge_preserves_multi_year_donations() -> None:
+    """DOOU MERGE key includes year — multiple donations to same candidate across years survive."""
+    import pandas as pd
+
+    pipeline = _make_pipeline()
+    pipeline._raw_candidatos = pd.read_csv(
+        FIXTURES / "tse_candidatos.csv", encoding="latin-1", dtype=str,
+    )
+    # Create two donations from same person to same candidate in different years
+    pipeline._raw_doacoes = pd.DataFrame([
+        {
+            "sq_candidato": "100001",
+            "cpf_cnpj_doador": "111.222.333-44",
+            "nome_doador": "Pedro Oliveira",
+            "valor": "1500.50",
+            "ano": "2022",
+        },
+        {
+            "sq_candidato": "100001",
+            "cpf_cnpj_doador": "111.222.333-44",
+            "nome_doador": "Pedro Oliveira",
+            "valor": "3000.00",
+            "ano": "2024",
+        },
+    ])
+    pipeline.transform()
+    pipeline.load()
+
+    # Find the person DOOU query
+    session_mock = pipeline.driver.session.return_value.__enter__.return_value
+    run_calls = session_mock.run.call_args_list
+
+    doou_calls = [
+        call for call in run_calls
+        if "DOOU" in str(call) and "Person {cpf:" in str(call)
+    ]
+    assert len(doou_calls) >= 1
+
+    # The query should include {year: row.year} in the MERGE key
+    query_str = str(doou_calls[0][0][0])
+    assert "{year: row.year}" in query_str, (
+        f"DOOU MERGE should include year in key to avoid collapsing. Got: {query_str}"
+    )
+
+    # Both donations should be in the data rows
+    call = doou_calls[0]
+    call_kwargs = call[1] if call[1] else {}
+    rows = call_kwargs.get("rows") or call[0][1]["rows"]
+    assert len(rows) == 2, f"Expected 2 donation rows, got {len(rows)}"
+    years = {r["year"] for r in rows}
+    assert years == {2022, 2024}
+
+
 def test_load_company_donors_include_razao_social() -> None:
     """Company donor nodes must include razao_social for API compatibility."""
     pipeline = _make_pipeline()

@@ -222,11 +222,12 @@ def test_transform_socios_rf_formats_cpf() -> None:
             "faixa_etaria": "6",
         },
     ])
-    partners, rels = pipeline._transform_socios_rf(pipeline._raw_socios)
+    partners, pf_rels, pj_rels = pipeline._transform_socios_rf(pipeline._raw_socios)
 
     assert len(partners) == 1
     assert partners[0]["cpf"] == "123.456.789-01"
-    assert rels[0]["source_key"] == "123.456.789-01"
+    assert pf_rels[0]["source_key"] == "123.456.789-01"
+    assert len(pj_rels) == 0
 
 
 # --- BQ format (extract + transform) ---
@@ -438,13 +439,15 @@ def test_transform_socios_rf_vectorized() -> None:
     pipeline = _make_pipeline()
     pipeline.extract()
     pipeline._build_estab_lookup(pipeline._raw_estabelecimentos)
-    partners, rels = pipeline._transform_socios_rf(pipeline._raw_socios)
+    partners, pf_rels, pj_rels = pipeline._transform_socios_rf(pipeline._raw_socios)
 
+    # All 3 fixture rows are PF (identificador_socio=2)
     assert len(partners) == 3
-    assert len(rels) == 3
+    assert len(pf_rels) == 3
+    assert len(pj_rels) == 0
     assert partners[0]["name"] == "JOAO DA SILVA"
-    assert "source_key" in rels[0]
-    assert "target_key" in rels[0]
+    assert "source_key" in pf_rels[0]
+    assert "target_key" in pf_rels[0]
 
 
 # --- Streaming pipeline ---
@@ -492,3 +495,115 @@ def test_run_streaming_bq_format_no_data(tmp_path: Path) -> None:
 
     # No crash, no loader calls
     assert not pipeline.driver.session.called
+
+
+# --- DM-002: PJ partner classification ---
+
+
+def test_transform_socios_rf_pj_partner_uses_format_cnpj() -> None:
+    """PJ partners (identificador_socio=1) get format_cnpj, not format_cpf."""
+    pipeline = _make_pipeline()
+    pipeline.extract()
+    pipeline._build_estab_lookup(pipeline._raw_estabelecimentos)
+
+    pipeline._raw_socios = pd.DataFrame([
+        {
+            "cnpj_basico": "00000000",
+            "identificador_socio": "1",
+            "nome_socio": "HOLDING ABC LTDA",
+            "cpf_cnpj_socio": "12345678000199",
+            "qualificacao_socio": "22",
+            "data_entrada": "20200115",
+            "pais": "0",
+            "representante_legal": "",
+            "nome_representante": "0",
+            "qualificacao_representante": "0",
+            "faixa_etaria": "0",
+        },
+        {
+            "cnpj_basico": "00000000",
+            "identificador_socio": "2",
+            "nome_socio": "JOAO DA SILVA",
+            "cpf_cnpj_socio": "12345678901",
+            "qualificacao_socio": "22",
+            "data_entrada": "20200115",
+            "pais": "0",
+            "representante_legal": "",
+            "nome_representante": "0",
+            "qualificacao_representante": "0",
+            "faixa_etaria": "6",
+        },
+    ])
+
+    partners, pf_rels, pj_rels = pipeline._transform_socios_rf(pipeline._raw_socios)
+
+    # Only PF partner returned as Person
+    assert len(partners) == 1
+    assert partners[0]["cpf"] == "123.456.789-01"
+
+    # PF relationship: Person→Company
+    assert len(pf_rels) == 1
+    assert pf_rels[0]["source_key"] == "123.456.789-01"
+
+    # PJ relationship: Company→Company with formatted CNPJ
+    assert len(pj_rels) == 1
+    assert pj_rels[0]["source_key"] == "12.345.678/0001-99"
+
+
+def test_transform_stores_pj_relationships() -> None:
+    """Full transform populates pj_relationships list."""
+    pipeline = _make_pipeline()
+    pipeline.extract()
+    pipeline._build_estab_lookup(pipeline._raw_estabelecimentos)
+
+    pipeline._raw_socios = pd.DataFrame([
+        {
+            "cnpj_basico": "00000000",
+            "identificador_socio": "1",
+            "nome_socio": "HOLDING XYZ",
+            "cpf_cnpj_socio": "98765432000188",
+            "qualificacao_socio": "22",
+            "data_entrada": "20210101",
+            "pais": "0",
+            "representante_legal": "",
+            "nome_representante": "0",
+            "qualificacao_representante": "0",
+            "faixa_etaria": "0",
+        },
+    ])
+
+    pipeline.transform()
+
+    assert len(pipeline.partners) == 0  # no PF partners
+    assert len(pipeline.relationships) == 0  # no PF relationships
+    assert len(pipeline.pj_relationships) == 1
+    assert pipeline.pj_relationships[0]["source_key"] == "98.765.432/0001-88"
+
+
+# --- DM-003: Date normalization ---
+
+
+def test_transform_socios_rf_normalizes_data_entrada() -> None:
+    """data_entrada in YYYYMMDD format is normalized to YYYY-MM-DD."""
+    pipeline = _make_pipeline()
+    pipeline.extract()
+    pipeline._build_estab_lookup(pipeline._raw_estabelecimentos)
+
+    pipeline._raw_socios = pd.DataFrame([
+        {
+            "cnpj_basico": "00000000",
+            "identificador_socio": "2",
+            "nome_socio": "TEST",
+            "cpf_cnpj_socio": "12345678901",
+            "qualificacao_socio": "22",
+            "data_entrada": "20200115",
+            "pais": "0",
+            "representante_legal": "",
+            "nome_representante": "0",
+            "qualificacao_representante": "0",
+            "faixa_etaria": "6",
+        },
+    ])
+
+    _, pf_rels, _ = pipeline._transform_socios_rf(pipeline._raw_socios)
+    assert pf_rels[0]["data_entrada"] == "2020-01-15"

@@ -59,7 +59,7 @@ describe("GraphCanvas", () => {
     expect(graphData.links).toHaveLength(2);
   });
 
-  it("filters nodes by enabledTypes", () => {
+  it("uses nodeVisibility to filter by enabledTypes", () => {
     render(
       <GraphCanvas
         {...defaultProps}
@@ -67,10 +67,16 @@ describe("GraphCanvas", () => {
       />,
     );
 
+    // graphData still contains all nodes (simulation stability)
     const graphData = capturedProps.graphData as { nodes: { id: string }[]; links: unknown[] };
-    expect(graphData.nodes).toHaveLength(2);
-    expect(graphData.nodes.map((n) => n.id)).toEqual(["n1", "n2"]);
-    expect(graphData.links).toHaveLength(1);
+    expect(graphData.nodes).toHaveLength(3);
+    expect(graphData.links).toHaveLength(2);
+
+    // nodeVisibility callback hides disabled types
+    const nodeVis = capturedProps.nodeVisibility as (node: { id: string; type: string }) => boolean;
+    expect(nodeVis({ id: "n1", type: "person" })).toBe(true);
+    expect(nodeVis({ id: "n2", type: "company" })).toBe(true);
+    expect(nodeVis({ id: "n3", type: "sanction" })).toBe(false);
   });
 
   it("invokes onNodeClick when node is clicked", () => {

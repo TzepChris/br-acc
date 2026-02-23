@@ -15,6 +15,7 @@ from icarus_etl.transforms import (
     format_cnpj,
     format_cpf,
     normalize_name,
+    parse_date,
     strip_document,
 )
 
@@ -53,18 +54,6 @@ class SanctionsPipeline(Pipeline):
             keep_default_na=False,
         )
 
-    def _parse_date(self, value: str) -> str:
-        """Parse a date string, returning ISO format or empty string."""
-        value = value.strip()
-        if not value:
-            return ""
-        for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
-            try:
-                return str(pd.to_datetime(value, format=fmt).strftime("%Y-%m-%d"))
-            except ValueError:
-                continue
-        return value
-
     def _process_rows(
         self, df: pd.DataFrame, sanction_type: str
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -85,8 +74,8 @@ class SanctionsPipeline(Pipeline):
                 doc_formatted = digits
 
             sanction_id = f"{sanction_type}_{digits}_{idx}"
-            date_start = self._parse_date(str(row["data_inicio"]))
-            date_end = self._parse_date(str(row["data_fim"]))
+            date_start = parse_date(str(row["data_inicio"]))
+            date_end = parse_date(str(row["data_fim"]))
 
             sanctions.append({
                 "sanction_id": sanction_id,

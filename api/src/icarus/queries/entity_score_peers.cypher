@@ -9,7 +9,9 @@ WITH peer LIMIT 500
 OPTIONAL MATCH (peer)-[r]-(connected)
 WITH peer, count(r) AS conn_count
 OPTIONAL MATCH (peer)-[:VENCEU]->(c:Contract)
-WITH peer, conn_count, COALESCE(sum(c.value), 0) AS fin_vol
+WITH peer, conn_count, COALESCE(sum(c.value), 0) AS contract_vol
+OPTIONAL MATCH (peer)-[:RECEBEU_EMPRESTIMO|DEVE]->(f:Finance)
+WITH peer, conn_count, contract_vol + COALESCE(sum(f.value), 0) AS fin_vol
 RETURN
   count(peer) AS peer_count,
   collect(conn_count) AS connection_counts,

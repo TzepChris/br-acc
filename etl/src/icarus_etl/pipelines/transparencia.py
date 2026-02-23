@@ -16,6 +16,7 @@ from icarus_etl.transforms import (
     format_cnpj,
     format_cpf,
     normalize_name,
+    parse_date,
     strip_document,
 )
 
@@ -101,12 +102,13 @@ class TransparenciaPipeline(Pipeline):
                 continue
 
             cnpj = format_cnpj(raw_cnpj)
+            date = parse_date(str(row["data_inicio"]))
             contracts.append({
                 "contract_id": f"{cnpj_digits}_{row['data_inicio']}",
                 "object": normalize_name(str(row["objeto"])),
                 "value": _parse_brl(str(row["valor"])),
                 "contracting_org": normalize_name(str(row["orgao_contratante"])),
-                "date": str(row["data_inicio"]),
+                "date": date,
                 "cnpj": cnpj,
                 "razao_social": normalize_name(str(row["razao_social"])),
             })

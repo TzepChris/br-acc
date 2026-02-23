@@ -9,6 +9,12 @@ const INITIAL_ENTITY_TYPES = [
   "contract",
   "sanction",
   "amendment",
+  "health",
+  "finance",
+  "embargo",
+  "education",
+  "convenio",
+  "laborstats",
 ];
 
 const INITIAL_REL_TYPES = [
@@ -18,6 +24,13 @@ const INITIAL_REL_TYPES = [
   "VENCEU",
   "AUTOR_EMENDA",
   "SANCIONADA",
+  "OPERA_UNIDADE",
+  "DEVE",
+  "RECEBEU_EMPRESTIMO",
+  "EMBARGADA",
+  "MANTEDORA_DE",
+  "BENEFICIOU",
+  "GEROU_CONVENIO",
 ];
 
 describe("useGraphExplorerStore", () => {
@@ -52,7 +65,7 @@ describe("useGraphExplorerStore", () => {
     useGraphExplorerStore.getState().toggleType("person");
     const types = useGraphExplorerStore.getState().enabledTypes;
     expect(types.has("person")).toBe(false);
-    expect(types.size).toBe(5);
+    expect(types.size).toBe(11);
   });
 
   it("toggleType adds a new entity type", () => {
@@ -61,14 +74,14 @@ describe("useGraphExplorerStore", () => {
     useGraphExplorerStore.getState().toggleType("person");
     const types = useGraphExplorerStore.getState().enabledTypes;
     expect(types.has("person")).toBe(true);
-    expect(types.size).toBe(6);
+    expect(types.size).toBe(12);
   });
 
   it("toggleRelType removes an existing relationship type", () => {
     useGraphExplorerStore.getState().toggleRelType("DOOU");
     const rels = useGraphExplorerStore.getState().enabledRelTypes;
     expect(rels.has("DOOU")).toBe(false);
-    expect(rels.size).toBe(5);
+    expect(rels.size).toBe(12);
   });
 
   it("toggleRelType adds a new relationship type", () => {
@@ -76,7 +89,7 @@ describe("useGraphExplorerStore", () => {
     useGraphExplorerStore.getState().toggleRelType("DOOU");
     const rels = useGraphExplorerStore.getState().enabledRelTypes;
     expect(rels.has("DOOU")).toBe(true);
-    expect(rels.size).toBe(6);
+    expect(rels.size).toBe(13);
   });
 
   it("selectNode sets a single node", () => {

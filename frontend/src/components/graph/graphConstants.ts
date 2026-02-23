@@ -21,6 +21,12 @@ export const ICON_MAP: Record<string, string> = {
   contract: "FileText",
   sanction: "AlertTriangle",
   amendment: "FileEdit",
+  health: "Heart",
+  finance: "DollarSign",
+  embargo: "Ban",
+  education: "GraduationCap",
+  convenio: "Handshake",
+  laborstats: "BarChart3",
 };
 
 // Pre-rendered icon cache
@@ -52,6 +58,12 @@ function createIconSvg(type: string, color: string, size: number): string {
     contract: `<rect x="${s * 0.2}" y="${s * 0.15}" width="${s * 0.6}" height="${s * 0.7}" rx="1" fill="${color}"/><line x1="${s * 0.35}" y1="${s * 0.4}" x2="${s * 0.65}" y2="${s * 0.4}" stroke="#060a07" stroke-width="1"/><line x1="${s * 0.35}" y1="${s * 0.55}" x2="${s * 0.65}" y2="${s * 0.55}" stroke="#060a07" stroke-width="1"/>`,
     sanction: `<polygon points="${s / 2},${s * 0.15} ${s * 0.8},${s * 0.8} ${s * 0.2},${s * 0.8}" fill="${color}"/><text x="${s / 2}" y="${s * 0.7}" text-anchor="middle" font-size="${s * 0.4}" fill="#060a07" font-weight="bold">!</text>`,
     amendment: `<rect x="${s * 0.2}" y="${s * 0.15}" width="${s * 0.6}" height="${s * 0.7}" rx="1" fill="${color}"/><path d="M${s * 0.55} ${s * 0.35} L${s * 0.65} ${s * 0.45} L${s * 0.45} ${s * 0.65} L${s * 0.35} ${s * 0.55} Z" fill="#060a07"/>`,
+    health: `<path d="M${s / 2} ${s * 0.25} C${s * 0.35} ${s * 0.15} ${s * 0.15} ${s * 0.25} ${s * 0.15} ${s * 0.4} C${s * 0.15} ${s * 0.6} ${s / 2} ${s * 0.8} ${s / 2} ${s * 0.8} C${s / 2} ${s * 0.8} ${s * 0.85} ${s * 0.6} ${s * 0.85} ${s * 0.4} C${s * 0.85} ${s * 0.25} ${s * 0.65} ${s * 0.15} ${s / 2} ${s * 0.25} Z" fill="${color}"/>`,
+    finance: `<rect x="${s * 0.2}" y="${s * 0.2}" width="${s * 0.6}" height="${s * 0.6}" rx="2" fill="${color}"/><text x="${s / 2}" y="${s * 0.6}" text-anchor="middle" font-size="${s * 0.35}" fill="#060a07" font-weight="bold">$</text>`,
+    embargo: `<circle cx="${s / 2}" cy="${s / 2}" r="${s * 0.35}" fill="${color}"/><line x1="${s * 0.3}" y1="${s * 0.3}" x2="${s * 0.7}" y2="${s * 0.7}" stroke="#060a07" stroke-width="2"/>`,
+    education: `<rect x="${s * 0.15}" y="${s * 0.45}" width="${s * 0.7}" height="${s * 0.35}" rx="1" fill="${color}"/><polygon points="${s / 2},${s * 0.2} ${s * 0.2},${s * 0.45} ${s * 0.8},${s * 0.45}" fill="${color}"/>`,
+    convenio: `<circle cx="${s * 0.35}" cy="${s * 0.5}" r="${s * 0.2}" fill="${color}"/><circle cx="${s * 0.65}" cy="${s * 0.5}" r="${s * 0.2}" fill="${color}"/>`,
+    laborstats: `<rect x="${s * 0.2}" y="${s * 0.5}" width="${s * 0.15}" height="${s * 0.3}" fill="${color}"/><rect x="${s * 0.425}" y="${s * 0.35}" width="${s * 0.15}" height="${s * 0.45}" fill="${color}"/><rect x="${s * 0.65}" y="${s * 0.2}" width="${s * 0.15}" height="${s * 0.6}" fill="${color}"/>`,
   };
   const shape =
     shapes[type] ??

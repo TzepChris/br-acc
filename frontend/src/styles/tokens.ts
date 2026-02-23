@@ -5,6 +5,12 @@ export const dataColors = {
   contract: "#F2CC8F",
   sanction: "#E56B6F",
   amendment: "#B8A9C9",
+  health: "#EC4899",
+  finance: "#3B82F6",
+  embargo: "#F97316",
+  education: "#A855F7",
+  convenio: "#2DD4BF",
+  laborstats: "#64748B",
 } as const;
 
 export type DataEntityType = keyof typeof dataColors;
@@ -16,6 +22,13 @@ export const relationshipColors: Record<string, string> = {
   VENCEU: "#F2CC8F",
   AUTOR_EMENDA: "#F2CC8F",
   SANCIONADA: "#E56B6F",
+  OPERA_UNIDADE: "#EC4899",
+  DEVE: "#3B82F6",
+  RECEBEU_EMPRESTIMO: "#3B82F6",
+  EMBARGADA: "#F97316",
+  MANTEDORA_DE: "#A855F7",
+  BENEFICIOU: "#2DD4BF",
+  GEROU_CONVENIO: "#2DD4BF",
 };
 
 export const semanticColors = {

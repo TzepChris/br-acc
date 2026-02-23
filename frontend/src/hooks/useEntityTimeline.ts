@@ -10,6 +10,15 @@ export function useEntityTimeline(entityId: string) {
   const cursorRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!entityId) {
+      setEvents([]);
+      setLoading(false);
+      setError(null);
+      setHasMore(false);
+      cursorRef.current = null;
+      return;
+    }
+
     setEvents([]);
     setLoading(true);
     setError(null);
