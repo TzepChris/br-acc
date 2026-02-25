@@ -17,14 +17,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 def _make_pipeline() -> CagedPipeline:
     driver = MagicMock()
-    pipeline = CagedPipeline(driver=driver, data_dir=str(FIXTURES.parent))
-    return pipeline
+    return CagedPipeline(driver=driver, data_dir=str(FIXTURES))
 
 
-def _load_fixture_data(pipeline: CagedPipeline) -> None:
-    """Load CSV fixture directly into the pipeline's raw DataFrame."""
-    pipeline._raw = pd.read_csv(
-        FIXTURES / "caged" / "caged.csv",
+def _load_fixture_df() -> pd.DataFrame:
+    """Load CSV fixture as DataFrame for testing _transform_chunk."""
+    return pd.read_csv(
+        FIXTURES / "caged" / "caged_2023.csv",
         dtype=str,
         keep_default_na=False,
     )
@@ -82,47 +81,57 @@ class TestParseSalary:
         assert _parse_salary("\u2212100") is None
 
 
-class TestCagedTransform:
+class TestCagedExtract:
+    def test_finds_csv_files(self) -> None:
+        pipeline = _make_pipeline()
+        pipeline.extract()
+        assert len(pipeline._csv_files) == 1
+        assert pipeline._csv_files[0].name == "caged_2023.csv"
+
+    def test_empty_dir_yields_no_files(self, tmp_path: Path) -> None:
+        (tmp_path / "caged").mkdir()
+        pipeline = _make_pipeline()
+        pipeline.data_dir = str(tmp_path)
+        pipeline.extract()
+        assert len(pipeline._csv_files) == 0
+
+
+class TestCagedTransformChunk:
     def test_produces_movements(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
+        df = _load_fixture_df()
+        movements, company_rels, person_rels = pipeline._transform_chunk(df)
         # 5 rows: row 4 has CNPJ "123" (3 digits, invalid), rest are 8-digit roots padded to 14
-        assert len(pipeline.movements) == 4
+        assert len(movements) == 4
 
     def test_produces_company_rels(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        assert len(pipeline.company_rels) == 4
+        df = _load_fixture_df()
+        _, company_rels, _ = pipeline._transform_chunk(df)
+        assert len(company_rels) == 4
 
     def test_formats_cnpj(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        cnpjs = {m["cnpj"] for m in pipeline.movements}
+        df = _load_fixture_df()
+        movements, _, _ = pipeline._transform_chunk(df)
+        cnpjs = {m["cnpj"] for m in movements}
         assert "12.345.678/0001-00" in cnpjs
         assert "98.765.432/0001-00" in cnpjs
 
     def test_skips_invalid_cnpj(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        cnpjs = {m["cnpj"] for m in pipeline.movements}
+        df = _load_fixture_df()
+        movements, _, _ = pipeline._transform_chunk(df)
+        cnpjs = {m["cnpj"] for m in movements}
         # Row with CNPJ "123" should be skipped
         for cnpj in cnpjs:
             assert len(cnpj) == 18  # formatted CNPJ is 18 chars
 
     def test_movement_fields(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        movement = pipeline.movements[0]
+        df = _load_fixture_df()
+        movements, _, _ = pipeline._transform_chunk(df)
+        movement = movements[0]
         assert "movement_id" in movement
         assert "cnpj" in movement
         assert "movement_type" in movement
@@ -136,49 +145,43 @@ class TestCagedTransform:
 
     def test_movement_id_is_deterministic_hash(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        for movement in pipeline.movements:
+        df = _load_fixture_df()
+        movements, _, _ = pipeline._transform_chunk(df)
+        for movement in movements:
             assert len(movement["movement_id"]) == 16
 
     def test_parses_salary(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        movements_with_salary = [m for m in pipeline.movements if "salary" in m]
+        df = _load_fixture_df()
+        movements, _, _ = pipeline._transform_chunk(df)
+        movements_with_salary = [m for m in movements if "salary" in m]
         assert len(movements_with_salary) >= 1
-
         # First row has salary 2500.00
-        first = pipeline.movements[0]
+        first = movements[0]
         assert first["salary"] == 2500.0
 
     def test_movement_types(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        types = {m["movement_type"] for m in pipeline.movements}
+        df = _load_fixture_df()
+        movements, _, _ = pipeline._transform_chunk(df)
+        types = {m["movement_type"] for m in movements}
         assert "admissao" in types
         assert "desligamento" in types
 
     def test_movement_date_format(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        for movement in pipeline.movements:
+        df = _load_fixture_df()
+        movements, _, _ = pipeline._transform_chunk(df)
+        for movement in movements:
             date = movement["movement_date"]
             assert len(date) == 7  # YYYY-MM
             assert date[4] == "-"
 
     def test_company_rels_link_cnpj_to_movement_id(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        for rel in pipeline.company_rels:
+        df = _load_fixture_df()
+        _, company_rels, _ = pipeline._transform_chunk(df)
+        for rel in company_rels:
             assert "source_key" in rel  # CNPJ
             assert "target_key" in rel  # movement_id
             assert "." in rel["source_key"]  # formatted CNPJ
@@ -187,18 +190,16 @@ class TestCagedTransform:
     def test_no_person_rels_without_cpf(self) -> None:
         """Fixture rows have no CPF column, so person_rels should be empty."""
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        assert len(pipeline.person_rels) == 0
+        df = _load_fixture_df()
+        _, _, person_rels = pipeline._transform_chunk(df)
+        assert len(person_rels) == 0
 
     def test_pads_8_digit_cnpj_root(self) -> None:
         """8-digit cnpj_raiz should be padded to 14 digits (root + 000100)."""
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
-
-        cnpjs = {m["cnpj"] for m in pipeline.movements}
+        df = _load_fixture_df()
+        movements, _, _ = pipeline._transform_chunk(df)
+        cnpjs = {m["cnpj"] for m in movements}
         # 12345678 -> 12345678000100 -> 12.345.678/0001-00
         assert "12.345.678/0001-00" in cnpjs
 
@@ -206,8 +207,7 @@ class TestCagedTransform:
 class TestCagedLoad:
     def test_load_creates_labor_movement_nodes(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
+        pipeline.extract()
         pipeline.load()
 
         session_mock = pipeline.driver.session.return_value.__enter__.return_value
@@ -221,8 +221,7 @@ class TestCagedLoad:
 
     def test_load_creates_company_nodes(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
+        pipeline.extract()
         pipeline.load()
 
         session_mock = pipeline.driver.session.return_value.__enter__.return_value
@@ -236,8 +235,7 @@ class TestCagedLoad:
 
     def test_load_creates_movimentou_relationships(self) -> None:
         pipeline = _make_pipeline()
-        _load_fixture_data(pipeline)
-        pipeline.transform()
+        pipeline.extract()
         pipeline.load()
 
         session_mock = pipeline.driver.session.return_value.__enter__.return_value
@@ -249,9 +247,9 @@ class TestCagedLoad:
         ]
         assert len(rel_calls) >= 1
 
-    def test_load_skips_when_empty(self) -> None:
+    def test_load_skips_when_no_files(self) -> None:
         pipeline = _make_pipeline()
-        # Don't load fixture data -- movements and rels remain empty
+        # Don't call extract -- _csv_files remains empty
         pipeline.load()
 
         session_mock = pipeline.driver.session.return_value.__enter__.return_value

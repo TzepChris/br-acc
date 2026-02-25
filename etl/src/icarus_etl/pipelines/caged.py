@@ -27,6 +27,9 @@ _MOVEMENT_TYPES: dict[str, str] = {
     "3": "desligamento",  # some codes map to sub-types
 }
 
+# Chunk size for streaming CSV reads (100K rows per chunk)
+_READ_CHUNK_SIZE = 100_000
+
 
 def _generate_movement_id(cnpj_digits: str, cpf_digits: str, date: str, mtype: str) -> str:
     """Deterministic ID from CNPJ + CPF + date + movement type."""
@@ -58,7 +61,12 @@ def _parse_salary(raw: str) -> float | None:
 
 
 class CagedPipeline(Pipeline):
-    """ETL pipeline for CAGED labor movement data (admissions/dismissals)."""
+    """ETL pipeline for CAGED labor movement data (admissions/dismissals).
+
+    Uses stream-and-load pattern: reads CSVs in chunks, transforms and loads
+    each chunk to Neo4j immediately, then discards. Never accumulates the
+    full dataset in memory (~80M+ rows across all years).
+    """
 
     name = "caged"
     source_id = "caged"
@@ -71,25 +79,26 @@ class CagedPipeline(Pipeline):
         chunk_size: int = 50_000,
     ) -> None:
         super().__init__(driver, data_dir, limit=limit, chunk_size=chunk_size)
-        self._raw: pd.DataFrame = pd.DataFrame()
-        self.movements: list[dict[str, Any]] = []
-        self.company_rels: list[dict[str, Any]] = []
-        self.person_rels: list[dict[str, Any]] = []
+        self._csv_files: list[Path] = []
 
     def extract(self) -> None:
         caged_dir = Path(self.data_dir) / "caged"
-        self._raw = pd.read_csv(
-            caged_dir / "caged.csv",
-            dtype=str,
-            keep_default_na=False,
-        )
+        self._csv_files = sorted(caged_dir.glob("caged_*.csv"))
+        if not self._csv_files:
+            logger.warning("No caged_*.csv files found in %s", caged_dir)
 
     def transform(self) -> None:
+        pass  # Transform happens per chunk in load()
+
+    def _transform_chunk(
+        self, df: pd.DataFrame,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+        """Transform a DataFrame chunk into (movements, company_rels, person_rels)."""
         movements: list[dict[str, Any]] = []
         company_rels: list[dict[str, Any]] = []
         person_rels: list[dict[str, Any]] = []
 
-        for _idx, row in self._raw.iterrows():
+        for _idx, row in df.iterrows():
             cnpj_raw = str(row.get("cnpj_raiz", ""))
             cnpj_digits = strip_document(cnpj_raw)
 
@@ -148,41 +157,48 @@ class CagedPipeline(Pipeline):
                     "target_key": movement_id,
                 })
 
-        self.movements = deduplicate_rows(movements, ["movement_id"])
-        self.company_rels = company_rels
-        self.person_rels = person_rels
+        movements = deduplicate_rows(movements, ["movement_id"])
+        return movements, company_rels, person_rels
 
     def load(self) -> None:
         loader = Neo4jBatchLoader(self.driver)
 
-        if self.movements:
-            loader.load_nodes("LaborMovement", self.movements, key_field="movement_id")
+        company_query = (
+            "UNWIND $rows AS row "
+            "MATCH (c:Company {cnpj: row.source_key}) "
+            "MATCH (m:LaborMovement {movement_id: row.target_key}) "
+            "MERGE (c)-[:MOVIMENTOU]->(m)"
+        )
+        person_query = (
+            "UNWIND $rows AS row "
+            "MATCH (p:Person {cpf: row.source_key}) "
+            "MATCH (m:LaborMovement {movement_id: row.target_key}) "
+            "MERGE (p)-[:EMPREGADO_EM]->(m)"
+        )
 
-        # Ensure Company nodes exist for CNPJ linking
-        if self.company_rels:
-            companies = [
-                {"cnpj": rel["source_key"]} for rel in self.company_rels
-            ]
-            loader.load_nodes(
-                "Company",
-                deduplicate_rows(companies, ["cnpj"]),
-                key_field="cnpj",
+        for csv_file in self._csv_files:
+            logger.info("Processing %s ...", csv_file.name)
+            reader = pd.read_csv(
+                csv_file, dtype=str, keep_default_na=False,
+                chunksize=_READ_CHUNK_SIZE, nrows=self.limit,
             )
+            for chunk in reader:
+                movements, company_rels, person_rels = self._transform_chunk(chunk)
 
-        if self.company_rels:
-            query = (
-                "UNWIND $rows AS row "
-                "MATCH (c:Company {cnpj: row.source_key}) "
-                "MATCH (m:LaborMovement {movement_id: row.target_key}) "
-                "MERGE (c)-[:MOVIMENTOU]->(m)"
-            )
-            loader.run_query_with_retry(query, self.company_rels)
+                if movements:
+                    loader.load_nodes("LaborMovement", movements, key_field="movement_id")
 
-        if self.person_rels:
-            query = (
-                "UNWIND $rows AS row "
-                "MATCH (p:Person {cpf: row.source_key}) "
-                "MATCH (m:LaborMovement {movement_id: row.target_key}) "
-                "MERGE (p)-[:EMPREGADO_EM]->(m)"
-            )
-            loader.run_query_with_retry(query, self.person_rels)
+                    # Ensure Company nodes exist for CNPJ linking
+                    companies = deduplicate_rows(
+                        [{"cnpj": rel["source_key"]} for rel in company_rels],
+                        ["cnpj"],
+                    )
+                    loader.load_nodes("Company", companies, key_field="cnpj")
+
+                if company_rels:
+                    loader.run_query_with_retry(company_query, company_rels)
+
+                if person_rels:
+                    loader.run_query_with_retry(person_query, person_rels)
+
+            logger.info("Finished %s", csv_file.name)

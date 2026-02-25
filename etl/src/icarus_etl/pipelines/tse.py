@@ -80,6 +80,7 @@ class TSEPipeline(Pipeline):
                 "sq_candidato": sq,
                 "name": name,
                 "partido": partido,
+                "uf": uf,
             }
             if cpf:
                 candidate["cpf"] = cpf
