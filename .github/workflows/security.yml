@@ -97,3 +97,17 @@ jobs:
 
       - name: Validate legal and ethics baseline
         run: python scripts/check_compliance_pack.py --repo-root .
+
+  public-boundary-gate:
+    name: Public Boundary Gate
+    if: github.repository == 'brunoclz/world-transparency-graph'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate public edition specialized boundary
+        run: python scripts/check_open_core_boundary.py --repo-root .

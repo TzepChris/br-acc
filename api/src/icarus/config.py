@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     rate_limit_auth: str = "300/minute"
     invite_code: str = ""
     cors_origins: str = "http://localhost:3000"
+    product_tier: str = "advanced"
     public_mode: bool = False
     public_allow_person: bool = False
     public_allow_entity_lookup: bool = False

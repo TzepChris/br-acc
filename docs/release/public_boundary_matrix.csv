@@ -3,6 +3,13 @@ api/**,PUBLIC,Core API code is required for public edition,include
 etl/**,PUBLIC,Core ingestion framework is required for public edition,include
 frontend/**,PUBLIC,Public demo UI is required,include
 infra/**,PUBLIC with review,Keep only generic local/dev deployment docs,include reviewed subset
+etl/src/icarus_etl/entity_resolution/**,REMOVE_FROM_PUBLIC,Specialized entity resolution and matching logic,exclude
+api/src/icarus/services/score_service.py,REMOVE_FROM_PUBLIC,Specialized exposure scoring logic,exclude
+api/src/icarus/services/pattern_service.py,REMOVE_FROM_PUBLIC,Specialized high-sensitivity pattern intelligence orchestration,exclude
+api/src/icarus/queries/pattern_*.cypher,REMOVE_FROM_PUBLIC,Specialized high-sensitivity pattern query logic,exclude
+api/src/icarus/queries/entity_score*.cypher,REMOVE_FROM_PUBLIC,Specialized score/timeline aggregation queries,exclude
+scripts/link_persons.cypher,REMOVE_FROM_PUBLIC,Specialized entity linking heuristics,exclude
+scripts/link_partners_probable.cypher,REMOVE_FROM_PUBLIC,Specialized probable identity linking heuristics,exclude
 docs/brand/**,PUBLIC,Brand governance for release,include
 docs/demo/**,PUBLIC,Demo dataset contract and constraints,include
 docs/legal/**,PUBLIC,Compliance and responsible-use baseline,include

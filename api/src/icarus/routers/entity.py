@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from neo4j import AsyncSession
 
 from icarus.constants import PEP_ROLES
-from icarus.dependencies import get_session
+from icarus.dependencies import get_intelligence_provider, get_session
 from icarus.models.entity import (
     ConnectionResponse,
     EntityResponse,
@@ -15,6 +15,7 @@ from icarus.models.entity import (
     TimelineEvent,
     TimelineResponse,
 )
+from icarus.services.intelligence_provider import IntelligenceProvider
 from icarus.services.neo4j_service import execute_query, execute_query_single, sanitize_props
 from icarus.services.public_guard import (
     enforce_entity_lookup_enabled,
@@ -25,7 +26,6 @@ from icarus.services.public_guard import (
     sanitize_public_properties,
     should_hide_person_entities,
 )
-from icarus.services.score_service import compute_exposure
 
 router = APIRouter(prefix="/api/v1/entity", tags=["entity"])
 
@@ -148,8 +148,10 @@ async def get_entity_by_element_id(
 async def get_entity_exposure(
     entity_id: str,
     session: Annotated[AsyncSession, Depends(get_session)],
+    provider: Annotated[IntelligenceProvider, Depends(get_intelligence_provider)],
 ) -> ExposureResponse:
-    return await compute_exposure(session, entity_id)
+    enforce_entity_lookup_enabled()
+    return await provider.get_entity_exposure(session, entity_id)
 
 
 @router.get("/{entity_id}/timeline", response_model=TimelineResponse)
@@ -159,6 +161,7 @@ async def get_entity_timeline(
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> TimelineResponse:
+    enforce_entity_lookup_enabled()
     records = await execute_query(
         session,
         "entity_timeline",
@@ -201,6 +204,7 @@ async def get_connections(
     types: Annotated[str | None, Query()] = None,
     include_probable: Annotated[bool, Query()] = False,
 ) -> EntityWithConnections:
+    enforce_entity_lookup_enabled()
     records = await execute_query(
         session,
         "entity_connections",

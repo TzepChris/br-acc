@@ -11,6 +11,7 @@ class PatternResult(BaseModel):
     entity_ids: list[str]
     sources: list[SourceAttribution]
     exposure_tier: str = "public_safe"
+    intelligence_tier: str = "advanced"
 
 
 class PatternResponse(BaseModel):

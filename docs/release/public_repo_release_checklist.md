@@ -36,17 +36,22 @@ Require all checks:
 - `Bandit (Python)`
 - `Pip Audit (Python deps)`
 - `Public Privacy Gate`
+- `Compliance Pack Gate`
+- `Public Boundary Gate`
 
 ## 6) Configure environment defaults
 - Set public deployment environment vars:
+  - `PRODUCT_TIER=community`
   - `PUBLIC_MODE=true`
   - `PUBLIC_ALLOW_PERSON=false`
   - `PUBLIC_ALLOW_ENTITY_LOOKUP=false`
   - `PUBLIC_ALLOW_INVESTIGATIONS=false`
+  - `VITE_PUBLIC_MODE=true`
 
 ## 7) Final checks before launch
 - `python scripts/check_public_privacy.py --repo-root .` => `PASS`
 - `python scripts/check_compliance_pack.py --repo-root .` => `PASS`
+- `python scripts/check_open_core_boundary.py --repo-root .` => `PASS`
 - Confirm no internal runbooks in public repo
 - Confirm demo data is synthetic (`data/demo/synthetic_graph.json`)
 - Confirm all legal docs exist in root:

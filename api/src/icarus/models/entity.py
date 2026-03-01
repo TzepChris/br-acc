@@ -51,6 +51,7 @@ class ExposureResponse(BaseModel):
     peer_group: str
     peer_count: int
     sources: list[SourceAttribution]
+    intelligence_tier: str = "advanced"
 
 
 class TimelineEvent(BaseModel):

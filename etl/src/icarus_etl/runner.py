@@ -4,6 +4,7 @@ import os
 import click
 from neo4j import GraphDatabase
 
+from icarus_etl.linking_hooks import run_post_load_hooks
 from icarus_etl.pipelines.bcb import BcbPipeline
 from icarus_etl.pipelines.bndes import BndesPipeline
 from icarus_etl.pipelines.caged import CagedPipeline
@@ -114,6 +115,13 @@ def cli() -> None:
 @click.option("--data-dir", default="./data", help="Directory for downloaded data")
 @click.option("--limit", type=int, default=None, help="Limit rows processed")
 @click.option("--chunk-size", type=int, default=50_000, help="Chunk size for batch processing")
+@click.option(
+    "--linking-tier",
+    type=click.Choice(["community", "advanced"]),
+    default=os.getenv("LINKING_TIER", "advanced"),
+    show_default=True,
+    help="Post-load linking strategy tier",
+)
 @click.option("--streaming/--no-streaming", default=False, help="Streaming mode")
 @click.option("--start-phase", type=int, default=1, help="Skip to phase N")
 @click.option("--history/--no-history", default=False, help="Enable history mode when supported")
@@ -126,6 +134,7 @@ def run(
     data_dir: str,
     limit: int | None,
     chunk_size: int,
+    linking_tier: str,
     streaming: bool,
     start_phase: int,
     history: bool,
@@ -159,6 +168,13 @@ def run(
         pipeline.run_streaming(start_phase=start_phase)
     else:
         pipeline.run()
+
+    run_post_load_hooks(
+        driver=driver,
+        source=source,
+        neo4j_database=neo4j_database,
+        linking_tier=linking_tier,
+    )
 
     driver.close()
 

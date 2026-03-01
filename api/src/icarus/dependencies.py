@@ -8,6 +8,7 @@ from neo4j import AsyncDriver, AsyncGraphDatabase, AsyncSession
 from icarus.config import settings
 from icarus.models.user import UserResponse
 from icarus.services import auth_service
+from icarus.services.intelligence_provider import IntelligenceProvider, get_default_provider
 
 _driver: AsyncDriver | None = None
 
@@ -43,6 +44,10 @@ async def get_session(
 ) -> AsyncGenerator[AsyncSession]:
     async with driver.session(database=settings.neo4j_database) as session:
         yield session
+
+
+def get_intelligence_provider() -> IntelligenceProvider:
+    return get_default_provider()
 
 
 async def get_current_user(

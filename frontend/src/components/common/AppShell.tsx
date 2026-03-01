@@ -19,6 +19,7 @@ import { Kbd } from "@/components/common/Kbd";
 import { KeyboardShortcutsHelp } from "@/components/common/KeyboardShortcutsHelp";
 import { StatusBar } from "@/components/common/StatusBar";
 import { ToastContainer } from "@/components/common/ToastContainer";
+import { IS_PUBLIC_MODE } from "@/config/runtime";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useAuthStore } from "@/stores/auth";
 
@@ -94,15 +95,22 @@ export function AppShell() {
 
   // Register actions for command palette + keyboard shortcuts
   const actions: Action[] = useMemo(
-    () => [
-      { id: "go-dashboard", label: t("command.goToDashboard"), shortcut: "cmd+1", group: t("command.navigation"), handler: () => navigate("/app") },
-      { id: "go-search", label: t("command.goToSearch"), shortcut: "cmd+2", group: t("command.navigation"), handler: () => navigate("/app/search") },
-      { id: "go-patterns", label: t("command.goToPatterns"), shortcut: "cmd+3", group: t("command.navigation"), handler: () => navigate("/app/patterns") },
-      { id: "go-investigations", label: t("command.goToInvestigations"), shortcut: "cmd+4", group: t("command.navigation"), handler: () => navigate("/app/investigations") },
-      { id: "toggle-sidebar", label: t("command.toggleSidebar"), shortcut: "cmd+b", group: t("command.actions"), handler: () => setSidebarCollapsed((p) => !p) },
-      { id: "command-palette", label: t("shortcuts.commandPalette"), shortcut: "cmd+k", group: t("command.actions"), handler: () => setCommandOpen(true) },
-      { id: "show-shortcuts", label: t("command.showShortcuts"), shortcut: "shift+?", group: t("command.actions"), handler: () => setShortcutsOpen(true) },
-    ],
+    () => {
+      const base: Action[] = [
+        { id: "go-dashboard", label: t("command.goToDashboard"), shortcut: "cmd+1", group: t("command.navigation"), handler: () => navigate("/app") },
+        { id: "go-search", label: t("command.goToSearch"), shortcut: "cmd+2", group: t("command.navigation"), handler: () => navigate("/app/search") },
+        { id: "go-patterns", label: t("command.goToPatterns"), shortcut: "cmd+3", group: t("command.navigation"), handler: () => navigate("/app/patterns") },
+        { id: "toggle-sidebar", label: t("command.toggleSidebar"), shortcut: "cmd+b", group: t("command.actions"), handler: () => setSidebarCollapsed((p) => !p) },
+        { id: "command-palette", label: t("shortcuts.commandPalette"), shortcut: "cmd+k", group: t("command.actions"), handler: () => setCommandOpen(true) },
+        { id: "show-shortcuts", label: t("command.showShortcuts"), shortcut: "shift+?", group: t("command.actions"), handler: () => setShortcutsOpen(true) },
+      ];
+      if (!IS_PUBLIC_MODE) {
+        base.push(
+          { id: "go-investigations", label: t("command.goToInvestigations"), shortcut: "cmd+4", group: t("command.navigation"), handler: () => navigate("/app/investigations") },
+        );
+      }
+      return base;
+    },
     [t, navigate],
   );
 
@@ -137,7 +145,9 @@ export function AppShell() {
         </div>
 
         <div className={styles.navItems}>
-          {NAV_ITEMS.map(({ path, icon: Icon, labelKey }) => (
+          {NAV_ITEMS
+            .filter((item) => !(IS_PUBLIC_MODE && item.path.includes("investigations")))
+            .map(({ path, icon: Icon, labelKey }) => (
             <Link
               key={path}
               to={path}
@@ -165,10 +175,12 @@ export function AppShell() {
           {user && !sidebarCollapsed && (
             <span className={styles.userEmail}>{user.email}</span>
           )}
-          <button className={styles.logoutBtn} onClick={handleLogout} title={t("nav.logout")} aria-label={t("nav.logout")}>
-            <LogOut size={16} />
-            {!sidebarCollapsed && <span>{t("nav.logout")}</span>}
-          </button>
+          {!IS_PUBLIC_MODE && (
+            <button className={styles.logoutBtn} onClick={handleLogout} title={t("nav.logout")} aria-label={t("nav.logout")}>
+              <LogOut size={16} />
+              {!sidebarCollapsed && <span>{t("nav.logout")}</span>}
+            </button>
+          )}
           <button
             className={styles.collapseBtn}
             onClick={() => setSidebarCollapsed((p) => !p)}

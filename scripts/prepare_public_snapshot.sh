@@ -49,8 +49,8 @@ rsync -a \
   --include='scripts/' \
   --include='scripts/check_public_privacy.py' \
   --include='scripts/check_compliance_pack.py' \
+  --include='scripts/check_open_core_boundary.py' \
   --include='scripts/generate_demo_dataset.py' \
-  --include='scripts/link_persons.cypher' \
   --include='scripts/prepare_public_snapshot.sh' \
   --include='data/' \
   --include='data/demo/' \
@@ -77,6 +77,18 @@ rm -f "$OUT_DIR/docs/shadow_rollout_runbook.md"
 rm -f "$OUT_DIR/docs/ingestion_priority_runbook.md"
 rm -f "$OUT_DIR/docs/ops/storage_operations.md"
 rm -f "$OUT_DIR/scripts/auto_finalize_pncp_backfill.sh"
+rm -f "$OUT_DIR/scripts/link_persons.cypher"
+rm -f "$OUT_DIR/scripts/link_partners_probable.cypher"
+rm -rf "$OUT_DIR/etl/src/icarus_etl/entity_resolution"
+rm -f "$OUT_DIR/api/src/icarus/services/score_service.py"
+rm -f "$OUT_DIR/api/src/icarus/services/pattern_service.py"
+rm -f "$OUT_DIR/api/src/icarus/queries/pattern_"*.cypher
+rm -f "$OUT_DIR/api/src/icarus/queries/entity_score"*.cypher
+rm -f "$OUT_DIR/api/tests/unit/test_patterns.py"
+rm -f "$OUT_DIR/api/tests/unit/test_patterns_new.py"
+rm -f "$OUT_DIR/api/tests/unit/test_score_service.py"
+rm -f "$OUT_DIR/etl/tests/test_entity_resolution.py"
+rm -f "$OUT_DIR/etl/tests/integration/test_link_persons.py"
 rm -rf "$OUT_DIR/audit-results"
 
 # Ensure demo data exists
@@ -84,5 +96,6 @@ python3 "$OUT_DIR/scripts/generate_demo_dataset.py" --output "$OUT_DIR/data/demo
 
 # Run public privacy gate on generated snapshot
 python3 "$OUT_DIR/scripts/check_public_privacy.py" --repo-root "$OUT_DIR"
+python3 "$OUT_DIR/scripts/check_open_core_boundary.py" --repo-root "$OUT_DIR"
 
 printf 'Public snapshot prepared at: %s\n' "$OUT_DIR"

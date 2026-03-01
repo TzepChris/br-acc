@@ -11,6 +11,8 @@ Describe what changed and why.
 
 - [ ] No personal identifier exposure was introduced
 - [ ] `PUBLIC_MODE` behavior was reviewed (if relevant)
+- [ ] Public boundary gate is green
+- [ ] Public endpoints and demo data contain no personal data fields
 - [ ] Legal/policy docs were reviewed for scope-impacting changes
 - [ ] Snapshot boundary remains compliant with `docs/release/public_boundary_matrix.csv`
 

@@ -140,6 +140,7 @@ async def public_patterns_for_company(
                 entity_ids=[company_id],
                 sources=[SourceAttribution(database="neo4j_public")],
                 exposure_tier="public_safe",
+                intelligence_tier="community",
             )
         )
 

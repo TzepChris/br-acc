@@ -2,6 +2,8 @@
 
 Global public-data graph analysis platform.
 
+[![WTG Header](docs/brand/wtg-header.png)](docs/brand/wtg-header.png)
+
 [![CI](https://github.com/brunoclz/world-transparency-graph/actions/workflows/ci.yml/badge.svg)](https://github.com/brunoclz/world-transparency-graph/actions/workflows/ci.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
@@ -18,6 +20,8 @@ WTG (powered by Icarus Core) ingests public records and enables visual explorati
 - Public product: **World Transparency Graph (WTG)**
 - Civic movement: **BRCC**
 - Advanced engine: **Icarus Core**
+
+Public edition boundary reference: [docs/brand/open_core_boundary.md](docs/brand/open_core_boundary.md)
 
 ## Architecture
 
@@ -109,12 +113,24 @@ make test-frontend # TypeScript frontend tests
 
 WTG Open should run with the following safe defaults:
 
+- `PRODUCT_TIER=community`
 - `PUBLIC_MODE=true`
 - `PUBLIC_ALLOW_PERSON=false`
 - `PUBLIC_ALLOW_ENTITY_LOOKUP=false`
 - `PUBLIC_ALLOW_INVESTIGATIONS=false`
 
 With these defaults, public mode does not return personal-entity nodes (`Person`/`Partner`) or personal document properties.
+
+## Commercial offerings
+
+WTG Open is public and auditable.  
+Icarus Advanced is specialized and not included in this repository.
+
+Advanced offerings include:
+
+- Advanced entity-resolution precision modules
+- Advanced scoring and high-sensitivity pattern intelligence
+- Managed deployment and operational support
 
 ## Legal & Ethics
 
@@ -160,7 +176,7 @@ CORRUPTOS/
 │   ├── src/icarus_etl/
 │   │   ├── pipelines/    # CNPJ, TSE, transparency, sanctions
 │   │   ├── transforms/   # Name norm, doc formatting, dedup
-│   │   └── entity_resolution/  # splink config
+│   │   └── linking hooks  # Community/public-safe post-load hooks
 │   └── tests/            # 63 unit tests
 ├── frontend/             # React SPA
 │   └── src/

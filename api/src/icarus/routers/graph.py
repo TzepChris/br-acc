@@ -10,6 +10,7 @@ from icarus.models.entity import SourceAttribution
 from icarus.models.graph import GraphEdge, GraphNode, GraphResponse
 from icarus.services.neo4j_service import execute_query, sanitize_props
 from icarus.services.public_guard import (
+    enforce_entity_lookup_enabled,
     enforce_person_access_policy,
     has_person_labels,
     infer_exposure_tier,
@@ -100,6 +101,7 @@ async def get_graph(
     depth: Annotated[int, Query(ge=1, le=4)] = 2,
     entity_types: Annotated[str | None, Query()] = None,
 ) -> GraphResponse:
+    enforce_entity_lookup_enabled()
     type_list = [t.strip().lower() for t in entity_types.split(",")] if entity_types else None
 
     # Degree guard: cap depth to 1 for supernodes to prevent explosion

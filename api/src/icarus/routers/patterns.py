@@ -5,13 +5,47 @@ from neo4j import AsyncDriver, AsyncSession
 from starlette.requests import Request
 
 from icarus.config import settings
-from icarus.dependencies import get_driver, get_session
+from icarus.dependencies import get_driver, get_intelligence_provider, get_session
 from icarus.middleware.rate_limit import limiter
-from icarus.models.pattern import PATTERN_METADATA, PatternResponse
-from icarus.services.pattern_service import PATTERN_QUERIES, run_all_patterns, run_pattern
+from icarus.models.pattern import PatternResponse
+from icarus.services.intelligence_provider import IntelligenceProvider
 from icarus.services.public_guard import enforce_entity_lookup_enabled
 
 router = APIRouter(prefix="/api/v1/patterns", tags=["patterns"])
+
+
+async def run_all_patterns(
+    driver: AsyncDriver,
+    entity_id: str | None = None,
+    lang: str = "pt",
+    include_probable: bool = False,
+    provider: IntelligenceProvider | None = None,
+) -> list:
+    intelligence = provider or get_intelligence_provider()
+    return await intelligence.run_all_patterns(
+        driver,
+        entity_id=entity_id,
+        lang=lang,
+        include_probable=include_probable,
+    )
+
+
+async def run_pattern(
+    session: AsyncSession,
+    pattern_id: str,
+    entity_id: str | None = None,
+    lang: str = "pt",
+    include_probable: bool = False,
+    provider: IntelligenceProvider | None = None,
+) -> list:
+    intelligence = provider or get_intelligence_provider()
+    return await intelligence.run_pattern(
+        session,
+        pattern_id=pattern_id,
+        entity_id=entity_id,
+        lang=lang,
+        include_probable=include_probable,
+    )
 
 
 @router.get("/{entity_id}", response_model=PatternResponse)
@@ -20,6 +54,7 @@ async def get_patterns_for_entity(
     request: Request,
     entity_id: str,
     driver: Annotated[AsyncDriver, Depends(get_driver)],
+    provider: Annotated[IntelligenceProvider, Depends(get_intelligence_provider)],
     lang: Annotated[str, Query()] = "pt",
     include_probable: Annotated[bool, Query()] = False,
 ) -> PatternResponse:
@@ -30,6 +65,7 @@ async def get_patterns_for_entity(
         entity_id,
         lang,
         include_probable=include_probable,
+        provider=provider,
     )
     return PatternResponse(
         entity_id=entity_id,
@@ -45,13 +81,14 @@ async def get_specific_pattern(
     entity_id: str,
     pattern_name: str,
     session: Annotated[AsyncSession, Depends(get_session)],
+    provider: Annotated[IntelligenceProvider, Depends(get_intelligence_provider)],
     lang: Annotated[str, Query()] = "pt",
     include_probable: Annotated[bool, Query()] = False,
 ) -> PatternResponse:
     if settings.public_mode:
         enforce_entity_lookup_enabled()
-    if pattern_name not in PATTERN_QUERIES:
-        available = list(PATTERN_QUERIES.keys())
+    available = [row["id"] for row in provider.list_patterns()]
+    if pattern_name not in set(available):
         raise HTTPException(
             status_code=404,
             detail=f"Pattern not found: {pattern_name}. Available: {available}",
@@ -62,6 +99,7 @@ async def get_specific_pattern(
         entity_id,
         lang,
         include_probable=include_probable,
+        provider=provider,
     )
     return PatternResponse(
         entity_id=entity_id,
@@ -71,14 +109,7 @@ async def get_specific_pattern(
 
 
 @router.get("/", response_model=dict[str, list[dict[str, str]]])
-async def list_patterns() -> dict[str, list[dict[str, str]]]:
-    patterns = []
-    for pid, meta in PATTERN_METADATA.items():
-        patterns.append({
-            "id": pid,
-            "name_pt": meta.get("name_pt", pid),
-            "name_en": meta.get("name_en", pid),
-            "description_pt": meta.get("desc_pt", ""),
-            "description_en": meta.get("desc_en", ""),
-        })
-    return {"patterns": patterns}
+async def list_patterns(
+    provider: Annotated[IntelligenceProvider, Depends(get_intelligence_provider)],
+) -> dict[str, list[dict[str, str]]]:
+    return {"patterns": provider.list_patterns()}

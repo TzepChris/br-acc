@@ -9,6 +9,7 @@ import {
   InvestigationIcon,
   PatternIcon,
 } from "@/components/landing/FeatureIcons";
+import { IS_PUBLIC_MODE } from "@/config/runtime";
 import { HeroGraph } from "@/components/landing/HeroGraph";
 import { NetworkAnimation } from "@/components/landing/NetworkAnimation";
 import { StatsBar } from "@/components/landing/StatsBar";
@@ -121,7 +122,7 @@ export function Landing() {
 
             <p className={styles.subtitle}>{t("landing.heroSubtitle")}</p>
 
-            <Link to="/login" className={styles.cta}>
+            <Link to={IS_PUBLIC_MODE ? "/app/search" : "/login"} className={styles.cta}>
               {t("landing.cta")}
             </Link>
 
@@ -227,7 +228,7 @@ export function Landing() {
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div className={styles.footerTop}>
-            <Link to="/login" className={styles.footerLink}>
+            <Link to={IS_PUBLIC_MODE ? "/app/search" : "/login"} className={styles.footerLink}>
               {t("landing.footer.platform")}
             </Link>
             <span className={styles.footerLink}>

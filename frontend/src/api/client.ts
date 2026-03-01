@@ -137,6 +137,7 @@ export interface PatternResult {
   data: Record<string, unknown>;
   entity_ids: string[];
   sources: { database: string }[];
+  intelligence_tier?: "community" | "advanced";
 }
 
 export interface PatternResponse {
@@ -406,6 +407,7 @@ export interface ExposureResponse {
   peer_group: string;
   peer_count: number;
   sources: SourceAttribution[];
+  intelligence_tier?: "community" | "advanced";
 }
 
 export interface TimelineEvent {

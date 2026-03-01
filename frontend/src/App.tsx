@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useParams } from "react-router";
 import { AppShell } from "./components/common/AppShell";
 import { PublicShell } from "./components/common/PublicShell";
 import { Spinner } from "./components/common/Spinner";
+import { IS_PUBLIC_MODE } from "./config/runtime";
 import { Baseline } from "./pages/Baseline";
 import { Dashboard } from "./pages/Dashboard";
 import { Investigations } from "./pages/Investigations";
@@ -45,15 +46,15 @@ export function App() {
     <Routes>
       {/* Public shell — landing, login, register */}
       <Route
-        element={
+        element={IS_PUBLIC_MODE ? <PublicShell /> : (
           <RedirectIfAuth>
             <PublicShell />
           </RedirectIfAuth>
-        }
+        )}
       >
         <Route index element={<Landing />} />
-        <Route path="login" element={<Login />} />
-        <Route path="register" element={<Register />} />
+        {!IS_PUBLIC_MODE && <Route path="login" element={<Login />} />}
+        {!IS_PUBLIC_MODE && <Route path="register" element={<Register />} />}
       </Route>
 
       {/* Public — shared investigation (no auth, no shell) */}
@@ -62,11 +63,11 @@ export function App() {
       {/* Authenticated shell — the intelligence workspace */}
       <Route
         path="app"
-        element={
+        element={IS_PUBLIC_MODE ? <AppShell /> : (
           <RequireAuth>
             <AppShell />
           </RequireAuth>
-        }
+        )}
       >
         <Route index element={<Dashboard />} />
         <Route path="search" element={<Search />} />
@@ -75,8 +76,8 @@ export function App() {
         <Route path="patterns" element={<Patterns />} />
         <Route path="patterns/:entityId" element={<Patterns />} />
         <Route path="baseline/:entityId" element={<Baseline />} />
-        <Route path="investigations" element={<Investigations />} />
-        <Route path="investigations/:investigationId" element={<Investigations />} />
+        {!IS_PUBLIC_MODE && <Route path="investigations" element={<Investigations />} />}
+        {!IS_PUBLIC_MODE && <Route path="investigations/:investigationId" element={<Investigations />} />}
       </Route>
 
       {/* Catch-all */}
