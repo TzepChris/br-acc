@@ -46,11 +46,7 @@ rsync -a \
   --include='.github/' \
   --include='.github/***' \
   --include='scripts/' \
-  --include='scripts/check_public_privacy.py' \
-  --include='scripts/check_compliance_pack.py' \
-  --include='scripts/check_open_core_boundary.py' \
-  --include='scripts/generate_demo_dataset.py' \
-  --include='scripts/prepare_public_snapshot.sh' \
+  --include='scripts/***' \
   --include='data/' \
   --include='data/demo/' \
   --include='data/demo/***' \
