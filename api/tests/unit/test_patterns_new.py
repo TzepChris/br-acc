@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from icarus.services.pattern_service import PATTERN_QUERIES, run_pattern
 
 
